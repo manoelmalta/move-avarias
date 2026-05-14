@@ -1,6 +1,7 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/client";
 import type { UserRole } from "@/lib/auth/types";
 
@@ -65,18 +66,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const { pathname } = request.nextUrl;
       const isLoggedIn = !!session?.user;
 
-      if (pathname.startsWith("/api/auth")) return true;
+      if (pathname.startsWith("/api/auth")) return NextResponse.next();
 
       if (pathname.startsWith("/api/")) {
-        return isLoggedIn ? true : Response.json({ error: "Unauthorized" }, { status: 401 });
+        return isLoggedIn
+          ? NextResponse.next()
+          : Response.json({ error: "Unauthorized" }, { status: 401 });
       }
 
       if (pathname === "/login") {
         if (isLoggedIn) return Response.redirect(new URL("/dashboard", request.url));
-        return true;
+        return NextResponse.next();
       }
 
-      return isLoggedIn;
+      if (!isLoggedIn) {
+        return Response.redirect(new URL("/login", request.url));
+      }
+
+      return NextResponse.next();
     },
     jwt({ token, user }) {
       if (user) {
