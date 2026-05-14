@@ -131,7 +131,7 @@ move-avarias/
 | **Controle Multi-Cliente** | ⚠️ Parcial | Schema `Client` presente, todas as tabelas têm `clientId` | O schema está preparado para multi-tenancy. Páginas e APIs resolvem `clientId` a partir da sessão autenticada. Slug `"cliente-demo"` removido de toda a aplicação |
 | **Permissões / Perfis de Acesso** | ✅ Pronto | `src/lib/permissions/index.ts` | 5 perfis: SEPARADOR, LIDER, ANALISTA, GESTOR, ADMIN. 13 permissões granulares. Verificação no frontend (UI oculta elementos) e no backend (API retorna 403). Sessão real — nenhum perfil pode ser forjado pelo cliente |
 | **Layout / Identidade Visual** | ✅ Pronto | `src/components/layout/sidebar.tsx`, `src/app/globals.css`, `public/branding/` | Sidebar escura (#1C2333) com logo, textura de fundo e navegação. Header com nome/email/role reais e botão "Sair". Paleta verde (#16A34A) como cor de ação principal. Logo e background da marca presentes |
-| **Integração com Banco de Dados** | ✅ Pronto | `src/lib/db/client.ts`, `prisma/schema.prisma` | Prisma v7 com adapter `better-sqlite3`. Singleton com globalThis para hot-reload. Banco populado com dados demo funcionais |
+| **Integração com Banco de Dados** | ✅ Pronto | `src/lib/db/client.ts`, `prisma/schema.prisma` | Prisma v7 com adapter `@prisma/adapter-pg`. PostgreSQL/Supabase via `DATABASE_URL` pooled (pgBouncer :6543). Singleton com globalThis para hot-reload. Banco populado com dados demo no Supabase |
 | **Cadastro de Produtos** | ✅ Pronto | `src/app/products/page.tsx`, `src/components/products/products-manager.tsx` | CRUD completo (criar, editar, ativar/inativar) via dialog. Somente ADMIN. Auditoria nas alterações |
 | **Gestão de Preços** | ✅ Pronto | `src/app/prices/page.tsx`, `src/components/products/prices-manager.tsx` | Cadastro de preços por produto com vigência. Preço vigente calculado por data. Somente ADMIN |
 | **Parâmetros do Sistema** | ⚠️ Parcial | `src/app/parameters/page.tsx`, `src/app/api/parameters/route.ts` | Visualização de origens, tipos de avaria, status e destinações. **Sem CRUD** — parâmetros só podem ser alterados via seed ou SQL direto |
@@ -143,43 +143,43 @@ move-avarias/
 ## 4. Banco de Dados
 
 ### Tipo e Configuração
-- **Banco:** SQLite local (arquivo `./dev.db`, 135 KB)
-- **ORM:** Prisma v7.8.0 com adapter `@prisma/adapter-better-sqlite3`
-- **Supabase:** Não utilizado
-- **RLS:** Não aplicável — SQLite não suporta Row Level Security
-- **Políticas de segurança:** Não existem — o isolamento multi-cliente é feito exclusivamente em código (filtro `clientId` nas queries)
+- **Banco:** PostgreSQL via Supabase (cloud, região us-west-1)
+- **ORM:** Prisma v7.8.0 com adapter `@prisma/adapter-pg`
+- **Conexão runtime:** `DATABASE_URL` pooled via pgBouncer (porta 6543) — `pgbouncer=true`
+- **Conexão CLI:** `DIRECT_URL` direta (porta 5432) — usada pelo `prisma.config.ts` para migrations
+- **RLS:** Não configurado — isolamento multi-cliente feito exclusivamente em código (filtro `clientId`)
+- **SQLite:** Removido do runtime. `dev.db` e `prisma/dev.db` gitignored. `.env.sqlite.backup` preserva configuração anterior.
 
 ### Localização do Banco
-- `./dev.db` — banco ativo com dados (135 KB)
-- `./prisma/dev.db` — banco vazio (0 bytes), criado automaticamente pelo Prisma CLI mas sem uso
+- **Supabase:** `postgres.pyrvwrhddbbmcjyjjuip` — banco ativo com dados demo
+- `./dev.db` — arquivo SQLite local, gitignored, mantido apenas como backup offline
 
-### Tabelas Existentes
+### Tabelas no Supabase (após seed)
 
-| Tabela | Registros (dev) | Campos principais |
+| Tabela | Registros | Campos principais |
 |---|---|---|
 | `Client` | 1 | id, name, slug, createdAt, updatedAt |
-| `User` | 5 | id, clientId, name, email, role (string), active |
+| `User` | 5 | id, clientId, name, email, role, passwordHash, active |
 | `Product` | 3 | id, clientId, ean, dun, internalCode, description, active |
 | `ProductPrice` | 3 | id, clientId, productId, unitValue, validFrom, validTo, sourceNote |
-| `DamageOccurrence` | 5 | id, clientId, occurrenceCode, openedByUserId, originId, statusId, destinationId, description, destinationObservation, storageLocation, notes, completedAt |
-| `DamageOccurrenceItem` | 5 | id, clientId, occurrenceId, productId, barcodeInput, quantity, unitValue, totalValue, batch, expirationDate, damageTypeId |
+| `DamageOccurrence` | 3+ | id, clientId, occurrenceCode, openedByUserId, originId, statusId, destinationId, description, completedAt |
+| `DamageOccurrenceItem` | 3+ | id, clientId, occurrenceId, productId, quantity, unitValue, totalValue, damageTypeId |
 | `ParameterOrigin` | 4 | id, clientId, name, active, sortOrder |
 | `ParameterDamageType` | 8 | id, clientId, name, active, sortOrder |
 | `ParameterStatus` | 5 | id, clientId, name, funnelOrder, isFinal, active |
 | `ParameterDestination` | 6 | id, clientId, name, description, requiresStorageLocation, active, sortOrder |
-| `AuditLog` | 12 | id, clientId, entityType, entityId, occurrenceId, userId, action, fieldName, oldValue, newValue, createdAt |
+| `AuditLog` | 1+ | id, clientId, entityType, entityId, occurrenceId, userId, action, fieldName, oldValue, newValue |
 
 ### Migrations
-- **Total:** 1 migration (`20260428234415_init`)
-- **Estado:** Aplicada no banco ativo
+- **Total:** 1 migration PostgreSQL (`20260514173331_init_postgres`)
+- **Migrations SQLite:** arquivadas em `docs/archive/sqlite-migrations/` — não aplicadas ao PostgreSQL
+- **Estado:** "Database schema is up to date!" contra Supabase
 
 ### Pontos Frágeis ou Ausentes
-1. **Sem autenticação no banco** — qualquer acesso ao arquivo `dev.db` expõe todos os dados de todos os clientes
-2. **Multi-tenancy por software apenas** — se uma query esquecer o filtro `clientId`, vaza dados entre clientes
-3. **SQLite não escala para multi-usuário concorrente** — leitura OK, mas escritas simultâneas causam lock
-4. **Dois arquivos de banco** — `./dev.db` (ativo) e `./prisma/dev.db` (vazio) podem causar confusão
-5. **Sem campo `password` no modelo User** — autenticação futura exigirá migration
-6. **Role armazenado como `String`** no banco (não enum) — sem validação no nível de BD
+1. **RLS não configurado** — isolamento multi-cliente feito apenas por software; vazamento possível se query omitir filtro `clientId`
+2. **Float para valores monetários** — `unitValue`, `totalValue` usam `Float` (DOUBLE PRECISION); imprecisão acumulada possível em totais grandes
+3. **Role armazenado como `String`** no banco (não enum PostgreSQL) — sem validação no nível de BD
+4. **Vercel não configurado** — aplicação ainda roda apenas em localhost
 7. **Sem índices explícitos** além das constraints únicas — listagens grandes serão lentas sem índices em `clientId + createdAt`
 
 ---
@@ -390,9 +390,8 @@ Para **demonstração interna** em rede local com supervisão, é utilizável ho
 
 ### O que impede uso em cliente hoje?
 
-1. **Banco SQLite em arquivo local** — não suporta múltiplos usuários simultâneos, não tem backup automático e fica no servidor de desenvolvimento
-2. **Sem acesso remoto** — o sistema roda apenas em `localhost`, não há deploy em servidor acessível pelo cliente
-3. **Sem versionamento do código** — qualquer falha de hardware apaga o projeto inteiro
+1. **Sem acesso remoto** — o sistema roda apenas em `localhost`, não há deploy em servidor acessível pelo cliente
+2. **Sem versionamento do código** — qualquer falha de hardware apaga o projeto inteiro
 
 ---
 
@@ -401,7 +400,7 @@ Para **demonstração interna** em rede local com supervisão, é utilizável ho
 | # | Risco | Severidade |
 |---|---|---|
 | 1 | **Perda total do código** — nenhum commit real, nenhum remote. Uma falha de disco apaga tudo | 🔴 Crítico |
-| 2 | **Escalabilidade zero do banco** — SQLite com escritas concorrentes causa `SQLITE_BUSY` (timeout/lock). Com 3+ usuários simultâneos registrando avarias, há risco de corrupção | 🔴 Crítico |
+| 2 | **Vercel não configurado** — sem deploy, o sistema é acessível apenas em `localhost` | 🟠 Alto |
 | 3 | **Código gerado no ESLint** — `src/generated/prisma/` está sendo analisado pelo linter, causando `exit code 1` no CI. Bloquearia qualquer pipeline de deploy automatizado | 🟡 Médio |
 
 ---
@@ -411,7 +410,7 @@ Para **demonstração interna** em rede local com supervisão, é utilizável ho
 | Prioridade | Ação | Justificativa |
 |---|---|---|
 | **1 (Imediato)** | **Commit + remote git** — `git add -A && git commit` + criar repositório no GitHub/GitLab | Garante sobrevivência do código. Zero custo, máximo impacto |
-| **2 (Curto prazo)** | **Migrar banco para PostgreSQL** — Supabase ou Neon para ambiente remoto, mantendo SQLite apenas em dev local | Elimina limitações de concorrência e viabiliza deploy |
+| **2 (Curto prazo)** | **Deploy no Vercel** — conectar repositório GitHub ao Vercel, configurar env vars (`DATABASE_URL`, `DIRECT_URL`, `AUTH_SECRET`, `AUTH_URL`) | Torna o sistema acessível ao cliente sem depender de localhost |
 | **3 (Médio prazo)** | **CRUD de parâmetros + usuários** — telas admin para gerenciar origens, tipos de avaria, destinações, status e usuários | Indispensável para configuração por cliente sem acesso ao banco |
 | **4 (Médio prazo)** | **Upload de evidências** — campo de fotos na ocorrência (ex: Vercel Blob ou S3) | Funcionalidade esperada em sistema de avarias |
 | **5 (Médio prazo)** | **Relatórios / exportação** — CSV ou PDF das ocorrências com filtros | Usuários precisarão de dados exportáveis |
@@ -429,6 +428,28 @@ Commit `6a425de` na `main`: lint zerado, `.gitignore` corrigido, governança doc
 
 ### Rodada 2B.PoC — Prova Técnica Auth.js v5 (2026-05-14)
 **Resultado: COMPATÍVEL.** next-auth 5.0.0-beta.31 instalado na branch `feat/auth-real`. Lint, tsc e build passaram com 0 erros. 18 rotas geradas (incluindo `/api/auth/[...nextauth]`). Ajuste necessário: augmentação JWT via `@auth/core/jwt`, não `next-auth/jwt`.
+
+### Rodada 3C — Migração SQLite → PostgreSQL/Supabase (2026-05-14)
+- Branch: `feat/postgres-migration`
+- `@prisma/adapter-better-sqlite3`, `better-sqlite3`, `@types/better-sqlite3` removidos.
+- `pg`, `@prisma/adapter-pg`, `@types/pg` adicionados.
+- `prisma/schema.prisma`: provider alterado para `"postgresql"`. `url`/`directUrl` removidos do schema (Prisma v7 não suporta no schema — URLs ficam em `prisma.config.ts` e no adapter).
+- `prisma.config.ts`: `datasource.url` agora aponta para `DIRECT_URL` (conexão direta para CLI/migrations).
+- `src/lib/db/client.ts`: completamente reescrito para usar `PrismaPg` com `DATABASE_URL` pooled (pgBouncer, porta 6543).
+- `prisma/seed.ts`: `import "dotenv/config"` adicionado; adapter trocado para `PrismaPg` com `DATABASE_URL`.
+- `.env.example`: atualizado com modelo PostgreSQL (pooled + direct URLs).
+- Migrations SQLite arquivadas em `docs/archive/sqlite-migrations/` (2 arquivos).
+- Migrations antigas removidas de `prisma/migrations/`. `migration_lock.toml` atualizado para `postgresql`.
+- `npx prisma migrate dev --name init_postgres` criou e aplicou `20260514173331_init_postgres` no Supabase.
+- `npm run seed` populou Supabase com dados demo (1 cliente, 5 usuários, 3 produtos, 3 preços, 3 ocorrências).
+- Bateria de testes contra Supabase (porta 3000):
+  - Login `admin@demo.com` → 302; `/dashboard`, `/occurrences`, `/products`, `/prices`, `/parameters` → 200.
+  - `GET /api/dashboard` → `totalOccurrences=3`; `GET /api/occurrences` → 3 registros; `GET /api/products` → 3.
+  - `POST /api/occurrences` → 201; `PATCH` (editar) → 200; `PATCH` (concluir) → 200.
+  - `POST /api/products` → 201; `POST /api/prices` → 201.
+  - `GET /api/dashboard` sem sessão → `{"error":"Unauthorized"}`.
+- Lint: exit 0, 0 erros. TSC: exit 0. Build: exit 0, 20 rotas. Migrate status: "up to date".
+- Vercel ainda não configurado — próxima etapa.
 
 ### Rodada 2B.6 — Auditoria Final e Validação da Branch feat/auth-real (2026-05-14)
 - Auditoria completa de resíduos no código: `UserSelector`, `localStorage`, `cliente-demo`, `user` no body de requests — todos **zero ocorrências** em `src/`.
