@@ -449,6 +449,18 @@ Commit `6a425de` na `main`: lint zerado, `.gitignore` corrigido, governança doc
 ### Rodada 2B.PoC — Prova Técnica Auth.js v5 (2026-05-14)
 **Resultado: COMPATÍVEL.** next-auth 5.0.0-beta.31 instalado na branch `feat/auth-real`. Lint, tsc e build passaram com 0 erros. 18 rotas geradas (incluindo `/api/auth/[...nextauth]`). Ajuste necessário: augmentação JWT via `@auth/core/jwt`, não `next-auth/jwt`.
 
+### Rodada 2B.3 — Middleware e clientId nas Páginas (2026-05-14)
+- `src/proxy.ts` criado: todas as rotas privadas protegidas pelo `authorized` callback do Auth.js v5.
+- Next.js 16 usa `proxy.ts` (Node.js runtime) em lugar do `middleware.ts` (Edge runtime). O proxy Node.js suporta Prisma/bcrypt diretamente.
+- Matcher exclui `_next/static`, `_next/image`, `favicon.ico` e `branding/`.
+- Páginas `/login` e `/api/auth/*` são públicas; sem sessão → redirect para `/login`.
+- Usuário autenticado acessando `/login` → redirect para `/dashboard`.
+- Slug `"cliente-demo"` **removido de todas as páginas Server Components**: dashboard, occurrences, occurrences/[id], occurrences/new, products, prices, parameters, layout.
+- `session.user.clientId` usado para filtrar todos os dados por cliente autenticado.
+- Detalhe de ocorrência verifica `clientId === session.user.clientId` antes de renderizar (retorna `notFound()` se não pertencer ao cliente).
+- Slug ainda presente nas APIs (src/app/api/**) — remoção prevista para Rodada 2B.4.
+- UserSelector ainda temporário — previsto para Rodada 2B.5.
+
 ### Rodada 2B.2 — Login Real com Credentials (2026-05-14)
 - Login real implementado: Auth.js v5 Credentials Provider ativo com validação real de email/senha.
 - `authorize()` em `src/auth.ts` consulta o banco via Prisma, valida `active`, `passwordHash` e compara senha com bcryptjs.

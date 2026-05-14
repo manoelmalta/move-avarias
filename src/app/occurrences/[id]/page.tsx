@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db/client";
-import { notFound } from "next/navigation";
+import { auth } from "@/auth";
+import { notFound, redirect } from "next/navigation";
 import { OccurrenceDetail } from "@/components/occurrences/occurrence-detail";
 
 async function getOccurrence(id: string) {
@@ -28,9 +29,13 @@ async function getParameters(clientId: string) {
 }
 
 export default async function OccurrenceDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const session = await auth();
+  if (!session?.user) redirect("/login");
+
   const { id } = await params;
   const occurrence = await getOccurrence(id);
   if (!occurrence) notFound();
+  if (occurrence.clientId !== session.user.clientId) notFound();
 
   const parameters = await getParameters(occurrence.clientId);
 

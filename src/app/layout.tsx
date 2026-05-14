@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import "./globals.css";
+import { auth } from "@/auth";
 import { SessionProvider } from "@/lib/auth/session-context";
 import { prisma } from "@/lib/db/client";
 import { Sidebar } from "@/components/layout/sidebar";
@@ -16,11 +17,9 @@ export const metadata: Metadata = {
   description: "Sistema de Controle de Ocorrências de Avarias",
 };
 
-async function getUsers(): Promise<SessionUser[]> {
-  const client = await prisma.client.findFirst({ where: { slug: "cliente-demo" } });
-  if (!client) return [];
+async function getUsers(clientId: string): Promise<SessionUser[]> {
   const users = await prisma.user.findMany({
-    where: { clientId: client.id, active: true },
+    where: { clientId, active: true },
     orderBy: { name: "asc" },
   });
   return users.map((u) => ({
@@ -33,7 +32,8 @@ async function getUsers(): Promise<SessionUser[]> {
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const users = await getUsers();
+  const session = await auth();
+  const users = session?.user?.clientId ? await getUsers(session.user.clientId) : [];
 
   return (
     <html lang="pt-BR" className={`${geist.variable} h-full antialiased`}>

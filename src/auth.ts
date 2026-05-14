@@ -61,6 +61,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt" },
   pages: { signIn: "/login" },
   callbacks: {
+    authorized({ auth: session, request }) {
+      const { pathname } = request.nextUrl;
+      const isLoggedIn = !!session?.user;
+
+      if (pathname.startsWith("/api/auth")) return true;
+
+      if (pathname === "/login") {
+        if (isLoggedIn) return Response.redirect(new URL("/dashboard", request.url));
+        return true;
+      }
+
+      return isLoggedIn;
+    },
     jwt({ token, user }) {
       if (user) {
         token.sub = user.id;

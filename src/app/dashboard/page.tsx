@@ -1,22 +1,21 @@
 import { prisma } from "@/lib/db/client";
+import { auth } from "@/auth";
+import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils";
 import { ClipboardList, AlertCircle, CheckCircle, Clock, Package, TrendingUp } from "lucide-react";
 
-async function getDashboardData() {
-  const client = await prisma.client.findFirst({ where: { slug: "cliente-demo" } });
-  if (!client) return null;
-
+async function getDashboardData(clientId: string) {
   const [occurrences, statuses] = await Promise.all([
     prisma.damageOccurrence.findMany({
-      where: { clientId: client.id },
+      where: { clientId },
       include: {
         status: true,
         items: { include: { damageType: true } },
         origin: true,
       },
     }),
-    prisma.parameterStatus.findMany({ where: { clientId: client.id }, orderBy: { funnelOrder: "asc" } }),
+    prisma.parameterStatus.findMany({ where: { clientId }, orderBy: { funnelOrder: "asc" } }),
   ]);
 
   const totalOccurrences = occurrences.length;
@@ -56,7 +55,9 @@ async function getDashboardData() {
 }
 
 export default async function DashboardPage() {
-  const data = await getDashboardData();
+  const session = await auth();
+  if (!session?.user) redirect("/login");
+  const data = await getDashboardData(session.user.clientId);
 
   if (!data) return <p>Sem dados para exibir.</p>;
 
