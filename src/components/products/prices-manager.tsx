@@ -43,7 +43,7 @@ export function PricesManager({ products, prices: initial }: { products: Product
       const res = await fetch("/api/prices", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user, data: { productId: form.productId, unitValue: value, validFrom: form.validFrom, validTo: form.validTo || undefined, sourceNote: form.sourceNote || undefined } }),
+        body: JSON.stringify({ data: { productId: form.productId, unitValue: value, validFrom: form.validFrom, validTo: form.validTo || undefined, sourceNote: form.sourceNote || undefined } }),
       });
       const json = await res.json() as { error?: string };
       if (!res.ok) { setError(String(json.error ?? "Erro ao salvar")); return; }

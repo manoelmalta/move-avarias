@@ -27,14 +27,15 @@ model Client {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  clientId  String
-  name      String
-  email     String
-  role      String
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(cuid())
+  clientId     String
+  name         String
+  email        String
+  role         String
+  passwordHash String?
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   client      Client             @relation(fields: [clientId], references: [id])
   occurrences DamageOccurrence[]

@@ -1,24 +1,23 @@
 import { prisma } from "@/lib/db/client";
+import { auth } from "@/auth";
+import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
-async function getParameters() {
-  const client = await prisma.client.findFirst({ where: { slug: "cliente-demo" } });
-  if (!client) return null;
-
+async function getParameters(clientId: string) {
   const [origins, damageTypes, statuses, destinations] = await Promise.all([
-    prisma.parameterOrigin.findMany({ where: { clientId: client.id }, orderBy: { sortOrder: "asc" } }),
-    prisma.parameterDamageType.findMany({ where: { clientId: client.id }, orderBy: { sortOrder: "asc" } }),
-    prisma.parameterStatus.findMany({ where: { clientId: client.id }, orderBy: { funnelOrder: "asc" } }),
-    prisma.parameterDestination.findMany({ where: { clientId: client.id }, orderBy: { sortOrder: "asc" } }),
+    prisma.parameterOrigin.findMany({ where: { clientId }, orderBy: { sortOrder: "asc" } }),
+    prisma.parameterDamageType.findMany({ where: { clientId }, orderBy: { sortOrder: "asc" } }),
+    prisma.parameterStatus.findMany({ where: { clientId }, orderBy: { funnelOrder: "asc" } }),
+    prisma.parameterDestination.findMany({ where: { clientId }, orderBy: { sortOrder: "asc" } }),
   ]);
-
   return { origins, damageTypes, statuses, destinations };
 }
 
 export default async function ParametersPage() {
-  const data = await getParameters();
-  if (!data) return <p>Sem dados.</p>;
+  const session = await auth();
+  if (!session?.user) redirect("/login");
+  const data = await getParameters(session.user.clientId);
 
   return (
     <div className="space-y-6">

@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/db/client";
+import { auth } from "@/auth";
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,11 +19,8 @@ function getStatusVariant(
   return "secondary";
 }
 
-async function getOccurrences(searchParams: Record<string, string>) {
-  const client = await prisma.client.findFirst({ where: { slug: "cliente-demo" } });
-  if (!client) return [];
-
-  const where: Record<string, unknown> = { clientId: client.id };
+async function getOccurrences(clientId: string, searchParams: Record<string, string>) {
+  const where: Record<string, unknown> = { clientId };
   if (searchParams.statusId) where.statusId = searchParams.statusId;
   if (searchParams.originId) where.originId = searchParams.originId;
   if (searchParams.destinationId) where.destinationId = searchParams.destinationId;
@@ -45,20 +44,24 @@ async function getOccurrences(searchParams: Record<string, string>) {
   });
 }
 
-async function getFilterOptions() {
-  const client = await prisma.client.findFirst({ where: { slug: "cliente-demo" } });
-  if (!client) return { statuses: [], origins: [], destinations: [] };
+async function getFilterOptions(clientId: string) {
   const [statuses, origins, destinations] = await Promise.all([
-    prisma.parameterStatus.findMany({ where: { clientId: client.id }, orderBy: { funnelOrder: "asc" } }),
-    prisma.parameterOrigin.findMany({ where: { clientId: client.id }, orderBy: { sortOrder: "asc" } }),
-    prisma.parameterDestination.findMany({ where: { clientId: client.id }, orderBy: { sortOrder: "asc" } }),
+    prisma.parameterStatus.findMany({ where: { clientId }, orderBy: { funnelOrder: "asc" } }),
+    prisma.parameterOrigin.findMany({ where: { clientId }, orderBy: { sortOrder: "asc" } }),
+    prisma.parameterDestination.findMany({ where: { clientId }, orderBy: { sortOrder: "asc" } }),
   ]);
   return { statuses, origins, destinations };
 }
 
 export default async function OccurrencesPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
+  const session = await auth();
+  if (!session?.user) redirect("/login");
+  const { clientId } = session.user;
   const params = await searchParams;
-  const [occurrences, filterOptions] = await Promise.all([getOccurrences(params), getFilterOptions()]);
+  const [occurrences, filterOptions] = await Promise.all([
+    getOccurrences(clientId, params),
+    getFilterOptions(clientId),
+  ]);
 
   return (
     <div className="space-y-4">

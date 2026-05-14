@@ -3,14 +3,15 @@ import { prisma } from "@/lib/db/client";
 import { CreateOccurrenceSchema } from "@/lib/validations/occurrence";
 import { generateOccurrenceCode } from "@/lib/occurrence-code";
 import { createAuditLog } from "@/lib/audit";
-import type { SessionUser } from "@/lib/auth/types";
+import { auth } from "@/auth";
 
 export async function GET(req: NextRequest) {
-  const search = req.nextUrl.searchParams;
-  const client = await prisma.client.findFirst({ where: { slug: "cliente-demo" } });
-  if (!client) return NextResponse.json([]);
+  const session = await auth();
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const clientId = session.user.clientId;
 
-  const where: Record<string, unknown> = { clientId: client.id };
+  const search = req.nextUrl.searchParams;
+  const where: Record<string, unknown> = { clientId };
   if (search.get("statusId")) where.statusId = search.get("statusId");
   if (search.get("originId")) where.originId = search.get("originId");
   if (search.get("destinationId")) where.destinationId = search.get("destinationId");
@@ -37,18 +38,17 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const body = await req.json() as { user: SessionUser; data: unknown };
-  const { user, data } = body;
+  const session = await auth();
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { user } = session;
 
-  const parsed = CreateOccurrenceSchema.safeParse(data);
+  const body = await req.json() as { data: unknown };
+  const parsed = CreateOccurrenceSchema.safeParse(body.data);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
-  const client = await prisma.client.findFirst({ where: { slug: "cliente-demo" } });
-  if (!client) return NextResponse.json({ error: "Cliente não encontrado" }, { status: 500 });
-
-  const occurrenceCode = await generateOccurrenceCode(client.id);
+  const occurrenceCode = await generateOccurrenceCode(user.clientId);
   const firstStatus = await prisma.parameterStatus.findFirst({
-    where: { clientId: client.id, active: true },
+    where: { clientId: user.clientId, active: true },
     orderBy: { funnelOrder: "asc" },
   });
 
@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
 
   const occurrence = await prisma.damageOccurrence.create({
     data: {
-      clientId: client.id,
+      clientId: user.clientId,
       occurrenceCode,
       openedByUserId: user.id,
       originId: parsed.data.originId,
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
       notes: parsed.data.notes ?? null,
       items: {
         create: parsed.data.items.map((item) => ({
-          clientId: client.id,
+          clientId: user.clientId,
           productId: item.productId,
           barcodeInput: item.barcodeInput ?? null,
           quantity: item.quantity,
