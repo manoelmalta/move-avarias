@@ -423,6 +423,32 @@ Para **demonstração interna** em rede local com supervisão, é utilizável ho
 
 ## 13. Histórico de Rodadas de Implementação
 
+### Rodada 5B — UI de Gestão de Usuários (2026-05-14)
+
+- Branch: `feat/user-management-ui`
+- **`/users`** criada como Server Component protegida: sem sessão → redirect `/login`; role não ADMIN → redirect `/dashboard`.
+- **`src/app/users/page.tsx`**: busca usuários via Prisma com `select` explícito (sem `passwordHash`). Passa `users` e `currentUserId` para o componente cliente.
+- **`src/components/users/users-manager.tsx`** criado: tabela com Nome, E-mail, Perfil (badge colorido por role), Status (Ativo/Inativo), Criado em, Atualizado em, Ações.
+  - Dialog "Novo Usuário": campos nome, e-mail, perfil, senha inicial, confirmar senha. Validações no front. Envia `POST /api/users`.
+  - Dialog "Editar Usuário": nome, e-mail, perfil, toggle ativo/inativo. Envia apenas campos alterados via `PATCH /api/users/[id]`.
+  - Dialog "Redefinir Senha": nova senha + confirmação. Envia `{ newPassword }` via `PATCH`. Exibe sucesso sem mostrar senha.
+  - Tratamento amigável de erros 403/409: "Não é possível inativar o próprio usuário administrador.", "Não é possível remover o último administrador ativo.", "Já existe um usuário com este e-mail."
+  - `passwordHash` nunca manipulado, enviado ou exibido no frontend.
+  - Usuário atual marcado com "(você)" na tabela.
+- **`src/components/layout/sidebar.tsx`** atualizado: link "Usuários" (ícone `Users`) adicionado para `role === "ADMIN"` via `useSession()`. Não visível para outros perfis.
+- `npm run build`: sucesso — 22 rotas compiladas. `npx tsc --noEmit`: sem erros. Lint: 0 erros, 4 warnings pré-existentes. Prisma migrate: up to date.
+- Testes validados localmente com ADMIN e SEPARADOR.
+
+### Rodada 5A — API Segura de Gestão de Usuários (2026-05-14)
+
+- Branch: `feat/user-management-api`; mergeado em PR #4.
+- **`user:manage`** adicionada ao sistema de permissões (`src/lib/permissions/index.ts`) — exclusiva para `ADMIN`.
+- **`src/lib/validations/user.ts`** criado: `CreateUserSchema` e `UpdateUserSchema` com Zod. `UpdateUserSchema` rejeita body completamente vazio. `clientId` e `passwordHash` jamais aceitos do cliente.
+- **`GET /api/users`** reescrito: guard `user:manage` (403 se não ADMIN); select explícito sem `passwordHash`; inclui ativos e inativos; ordenação `active desc, name asc`.
+- **`POST /api/users`**: guard, validação Zod, `clientId` sempre da sessão, `bcrypt.hash(12)`, tratamento de P2002 → 409, audit log `CREATE`, retorno sem `passwordHash`.
+- **`PATCH /api/users/[id]`** criado: 4 proteções — (A) admin não inativa a si mesmo → 403; (B/C/D) único ADMIN não pode ser rebaixado/inativado → 409; reset de senha com `[REDACTED]` no audit log; P2002 → 409.
+- 9/9 cenários de teste aprovados.
+
 ### Rodada 1 — Baseline e Governança (2026-05-14)
 Commit `6a425de` na `main`: lint zerado, `.gitignore` corrigido, governança documentada (`AGENTS.md`, `docs/CHANGE_PROCESS.md`, `docs/BACKUP_POLICY.md`, `docs/TESTING_CHECKLIST.md`, `.env.example`).
 
