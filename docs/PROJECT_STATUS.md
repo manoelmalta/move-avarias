@@ -39,7 +39,7 @@ move-avarias/
 ├── .env                       # Contém DATABASE_URL
 ├── src/
 │   ├── app/
-│   │   ├── layout.tsx         # Layout raiz: SessionProvider + Sidebar + UserSelector
+│   │   ├── layout.tsx         # Layout raiz: SessionProvider + Sidebar + AuthUserMenu
 │   │   ├── page.tsx           # Redireciona para /dashboard
 │   │   ├── globals.css        # Estilos globais Tailwind v4
 │   │   ├── dashboard/
@@ -64,7 +64,7 @@ move-avarias/
 │   ├── components/
 │   │   ├── layout/
 │   │   │   ├── sidebar.tsx        # Navegação lateral com logo e menu
-│   │   │   └── user-selector.tsx  # Dropdown de seleção de usuário simulado
+│   │   │   └── auth-user-menu.tsx # Menu de usuário autenticado (nome, role, logout)
 │   │   ├── occurrences/
 │   │   │   ├── new-occurrence-form.tsx   # Formulário completo de nova ocorrência
 │   │   │   ├── occurrence-detail.tsx     # Detalhe + edição + conclusão + auditoria
@@ -85,7 +85,7 @@ move-avarias/
 │   ├── lib/
 │   │   ├── auth/
 │   │   │   ├── types.ts          # UserRole (5 perfis) + SessionUser
-│   │   │   └── session-context.tsx  # Context React do usuário simulado
+│   │   │   └── session-context.tsx  # Wrapper next-auth/react: SessionProvider + useSession
 │   │   ├── db/
 │   │   │   └── client.ts         # Singleton PrismaClient com adapter SQLite
 │   │   ├── permissions/
@@ -120,7 +120,7 @@ move-avarias/
 |---|---|---|---|
 | **Login / Autenticação** | ✅ Completo | `src/auth.ts`, `src/proxy.ts`, `src/app/login/`, `src/components/layout/auth-user-menu.tsx` | Auth.js v5 com Credentials Provider. Login com email+senha bcrypt. JWT com `id`, `clientId`, `name`, `email`, `role`. Proxy protege todas as rotas. APIs retornam 401 sem sessão. Logout server action. Header exibe nome/email/role reais. UserSelector removido |
 | **Dashboard** | ✅ Pronto | `src/app/dashboard/page.tsx`, `src/app/api/dashboard/route.ts` | 6 KPIs (total, abertas, em tratamento, finalizadas, itens, valor). 3 rankings: por status, tipo de avaria, origem. Totalmente conectado ao banco |
-| **Cadastro de Clientes** | ❌ Não iniciado | — | Não existe tela nem API para criar/editar clientes. O sistema usa `slug: "cliente-demo"` hardcoded em todas as rotas |
+| **Cadastro de Clientes** | ❌ Não iniciado | — | Não existe tela nem API para criar/editar clientes. `clientId` é resolvido via sessão em todas as rotas; slug `"cliente-demo"` removido |
 | **Cadastro de Usuários** | ❌ Não iniciado | `src/app/api/users/route.ts` (só GET) | Existe listagem de usuários via API. Não há tela de cadastro, edição ou gestão de usuários |
 | **Registro de Avarias** | ✅ Pronto | `src/app/occurrences/new/page.tsx`, `src/components/occurrences/new-occurrence-form.tsx`, `src/app/api/occurrences/route.ts` | Busca produto por EAN/DUN/código interno, preenchimento de quantidade/lote/validade/tipo, múltiplos itens por ocorrência, geração automática de código AVR-YYYY-NNNNN, auditoria na criação |
 | **Tratativa de Avarias** | ✅ Pronto | `src/app/occurrences/[id]/page.tsx`, `src/components/occurrences/occurrence-detail.tsx`, `src/app/api/occurrences/[id]/route.ts` | Edição de status, destinação, local de armazenagem e observações. Permissões por perfil controladas no frontend e backend |
@@ -129,8 +129,8 @@ move-avarias/
 | **Upload de Fotos / Evidências** | ❌ Não iniciado | — | Não existe nenhuma estrutura para upload de arquivos. Não há campo no schema, nem API, nem componente de upload |
 | **Relatórios / Exportação** | ❌ Não iniciado | — | Não existe tela de relatórios, exportação para CSV/Excel/PDF ou qualquer endpoint de exportação |
 | **Controle Multi-Cliente** | ⚠️ Parcial | Schema `Client` presente, todas as tabelas têm `clientId` | O schema está preparado para multi-tenancy. Páginas e APIs resolvem `clientId` a partir da sessão autenticada. Slug `"cliente-demo"` removido de toda a aplicação |
-| **Permissões / Perfis de Acesso** | ✅ Pronto | `src/lib/permissions/index.ts` | 5 perfis: SEPARADOR, LIDER, ANALISTA, GESTOR, ADMIN. 13 permissões granulares. Verificação no frontend (UI oculta elementos) e no backend (API retorna 403). Único gap: sem autenticação real, o cliente pode burlar as permissões trocando o user no dropdown |
-| **Layout / Identidade Visual** | ✅ Pronto | `src/components/layout/sidebar.tsx`, `src/app/globals.css`, `public/branding/` | Sidebar escura (#1C2333) com logo, textura de fundo e navegação. Header com UserSelector. Paleta verde (#16A34A) como cor de ação principal. Logo e background da marca presentes |
+| **Permissões / Perfis de Acesso** | ✅ Pronto | `src/lib/permissions/index.ts` | 5 perfis: SEPARADOR, LIDER, ANALISTA, GESTOR, ADMIN. 13 permissões granulares. Verificação no frontend (UI oculta elementos) e no backend (API retorna 403). Sessão real — nenhum perfil pode ser forjado pelo cliente |
+| **Layout / Identidade Visual** | ✅ Pronto | `src/components/layout/sidebar.tsx`, `src/app/globals.css`, `public/branding/` | Sidebar escura (#1C2333) com logo, textura de fundo e navegação. Header com nome/email/role reais e botão "Sair". Paleta verde (#16A34A) como cor de ação principal. Logo e background da marca presentes |
 | **Integração com Banco de Dados** | ✅ Pronto | `src/lib/db/client.ts`, `prisma/schema.prisma` | Prisma v7 com adapter `better-sqlite3`. Singleton com globalThis para hot-reload. Banco populado com dados demo funcionais |
 | **Cadastro de Produtos** | ✅ Pronto | `src/app/products/page.tsx`, `src/components/products/products-manager.tsx` | CRUD completo (criar, editar, ativar/inativar) via dialog. Somente ADMIN. Auditoria nas alterações |
 | **Gestão de Preços** | ✅ Pronto | `src/app/prices/page.tsx`, `src/components/products/prices-manager.tsx` | Cadastro de preços por produto com vigência. Preço vigente calculado por data. Somente ADMIN |
@@ -230,13 +230,13 @@ move-avarias/
 | Componente | Arquivo | Função |
 |---|---|---|
 | `Sidebar` | `src/components/layout/sidebar.tsx` | Navegação lateral com logo, menu e rodapé. Destaca item ativo |
-| `UserSelector` | `src/components/layout/user-selector.tsx` | Dropdown no header que simula troca de usuário logado. **Crítico: substitui autenticação real** |
+| `AuthUserMenu` | `src/components/layout/auth-user-menu.tsx` | Menu de usuário no header: exibe nome, email, role e botão "Sair" (logout server action) |
 | `NewOccurrenceForm` | `src/components/occurrences/new-occurrence-form.tsx` | Formulário completo de nova ocorrência: busca de produto por código, adição de itens, cálculo de total, envio para API |
 | `OccurrenceDetail` | `src/components/occurrences/occurrence-detail.tsx` | Exibe, edita e conclui uma ocorrência. Controla permissões via `hasPermission()`. Exibe histórico de auditoria |
 | `OccurrencesFilter` | `src/components/occurrences/occurrences-filter.tsx` | Barra de filtros da listagem: status, origem, destinação, código e datas. Manipula URL searchParams |
 | `ProductsManager` | `src/components/products/products-manager.tsx` | Tabela de produtos com CRUD (criar, editar, ativar/inativar) via dialog modal |
 | `PricesManager` | `src/components/products/prices-manager.tsx` | Tabela de preços com cadastro de novas vigências via dialog modal |
-| `SessionProvider` | `src/lib/auth/session-context.tsx` | Context React que armazena e distribui o usuário atual. Persiste em localStorage |
+| `SessionProvider` | `src/lib/auth/session-context.tsx` | Wrapper de `next-auth/react` que distribui a sessão real. `useSession()` retorna `{ user: SessionUser \| null }` lido da sessão Auth.js |
 
 ### Componentes UI (primitivos Radix UI encapsulados)
 `Badge`, `Button`, `Card`, `Dialog`, `Input`, `Label`, `Select`, `Table`, `Textarea` — em `src/components/ui/`
@@ -280,8 +280,6 @@ move-avarias/
 
 | Problema | Impacto | Localização |
 |---|---|---|
-| **Sem autenticação real** | Crítico para produção | Toda a camada `src/lib/auth/` |
-| **Cliente hardcoded em todas as rotas** | Bloqueante para multi-cliente | Todas as rotas API e páginas |
 | **Banco SQLite em arquivo local** | Inviável para servidor compartilhado | `src/lib/db/client.ts` |
 | **`setOcc` declarado mas nunca usado** em `occurrence-detail.tsx` | UI não atualiza após PATCH sem `router.refresh()` | `src/components/occurrences/occurrence-detail.tsx:67` |
 | **Parâmetros read-only** | Configuração impossível sem seed/SQL | `src/app/parameters/page.tsx` |
@@ -327,7 +325,7 @@ Exit code: 0 (sucesso)
 ▲ Next.js 16.2.4 (Turbopack)
 ✓ Compiled successfully in 2.3s
 ✓ TypeScript: OK
-✓ 17 rotas geradas (8 páginas + 9 APIs)
+✓ 20 rotas geradas (8 páginas + 12 APIs, incluindo Auth.js)
 
 Rotas estáticas (○): /, /_not-found, /dashboard, /occurrences/new, /parameters, /prices, /products
 Rotas dinâmicas (ƒ): /api/*, /occurrences, /occurrences/[id]
@@ -392,11 +390,9 @@ Para **demonstração interna** em rede local com supervisão, é utilizável ho
 
 ### O que impede uso em cliente hoje?
 
-1. **Sem autenticação real** — qualquer pessoa com acesso à URL pode operar como ADMIN sem senha
-2. **Banco SQLite em arquivo local** — não suporta múltiplos usuários simultâneos, não tem backup automático e fica no servidor de desenvolvimento
-3. **Sem acesso remoto** — o sistema roda apenas em `localhost`, não há deploy em servidor acessível pelo cliente
-4. **Sem versionamento do código** — qualquer falha de hardware apaga o projeto inteiro
-5. **Slug hardcoded** — impossível isolar dados de múltiplos clientes sem refatoração nas rotas
+1. **Banco SQLite em arquivo local** — não suporta múltiplos usuários simultâneos, não tem backup automático e fica no servidor de desenvolvimento
+2. **Sem acesso remoto** — o sistema roda apenas em `localhost`, não há deploy em servidor acessível pelo cliente
+3. **Sem versionamento do código** — qualquer falha de hardware apaga o projeto inteiro
 
 ---
 
@@ -406,9 +402,7 @@ Para **demonstração interna** em rede local com supervisão, é utilizável ho
 |---|---|---|
 | 1 | **Perda total do código** — nenhum commit real, nenhum remote. Uma falha de disco apaga tudo | 🔴 Crítico |
 | 2 | **Escalabilidade zero do banco** — SQLite com escritas concorrentes causa `SQLITE_BUSY` (timeout/lock). Com 3+ usuários simultâneos registrando avarias, há risco de corrupção | 🔴 Crítico |
-| 3 | **Ausência de autenticação** — o `UserSelector` não tem senha. Qualquer usuário pode se passar por ADMIN e concluir, editar ou visualizar qualquer ocorrência | 🔴 Crítico |
-| 4 | **Multi-tenancy frágil** — o slug `"cliente-demo"` está hardcoded em 14+ arquivos. Se uma query falhar em filtrar por `clientId`, dados de clientes diferentes se misturam | 🟠 Alto |
-| 5 | **Código gerado no ESLint** — `src/generated/prisma/` está sendo analisado pelo linter, causando `exit code 1` no CI. Bloquearia qualquer pipeline de deploy automatizado | 🟡 Médio |
+| 3 | **Código gerado no ESLint** — `src/generated/prisma/` está sendo analisado pelo linter, causando `exit code 1` no CI. Bloquearia qualquer pipeline de deploy automatizado | 🟡 Médio |
 
 ---
 
@@ -417,10 +411,10 @@ Para **demonstração interna** em rede local com supervisão, é utilizável ho
 | Prioridade | Ação | Justificativa |
 |---|---|---|
 | **1 (Imediato)** | **Commit + remote git** — `git add -A && git commit` + criar repositório no GitHub/GitLab | Garante sobrevivência do código. Zero custo, máximo impacto |
-| **2 (Curto prazo)** | **Implementar autenticação** — NextAuth.js com `CredentialsProvider` (email + senha bcrypt no banco) + campo `password` no modelo `User` | Sem isso o sistema não pode ser entregue a cliente |
-| **3 (Curto prazo)** | **Migrar banco para PostgreSQL** — Supabase ou Neon para ambiente remoto, mantendo SQLite apenas em dev local | Elimina limitações de concorrência e viabiliza deploy |
-| **4 (Médio prazo)** | **Resolver slug hardcoded** — extrair cliente da sessão autenticada em vez de `"cliente-demo"` | Habilita multi-tenancy real |
-| **5 (Médio prazo)** | **CRUD de parâmetros + usuários** — telas admin para gerenciar origens, tipos de avaria, destinações, status e usuários | Indispensável para configuração por cliente sem acesso ao banco |
+| **2 (Curto prazo)** | **Migrar banco para PostgreSQL** — Supabase ou Neon para ambiente remoto, mantendo SQLite apenas em dev local | Elimina limitações de concorrência e viabiliza deploy |
+| **3 (Médio prazo)** | **CRUD de parâmetros + usuários** — telas admin para gerenciar origens, tipos de avaria, destinações, status e usuários | Indispensável para configuração por cliente sem acesso ao banco |
+| **4 (Médio prazo)** | **Upload de evidências** — campo de fotos na ocorrência (ex: Vercel Blob ou S3) | Funcionalidade esperada em sistema de avarias |
+| **5 (Médio prazo)** | **Relatórios / exportação** — CSV ou PDF das ocorrências com filtros | Usuários precisarão de dados exportáveis |
 
 ---
 
@@ -435,6 +429,15 @@ Commit `6a425de` na `main`: lint zerado, `.gitignore` corrigido, governança doc
 
 ### Rodada 2B.PoC — Prova Técnica Auth.js v5 (2026-05-14)
 **Resultado: COMPATÍVEL.** next-auth 5.0.0-beta.31 instalado na branch `feat/auth-real`. Lint, tsc e build passaram com 0 erros. 18 rotas geradas (incluindo `/api/auth/[...nextauth]`). Ajuste necessário: augmentação JWT via `@auth/core/jwt`, não `next-auth/jwt`.
+
+### Rodada 2B.6 — Auditoria Final e Validação da Branch feat/auth-real (2026-05-14)
+- Auditoria completa de resíduos no código: `UserSelector`, `localStorage`, `cliente-demo`, `user` no body de requests — todos **zero ocorrências** em `src/`.
+- `docs/PROJECT_STATUS.md` atualizado: tabela de funcionalidades, árvore de arquivos, componentes, riscos e próximos passos corrigidos para refletir estado pós-autenticação real.
+- Bateria de testes autenticados via curl com servidor na porta 3003:
+  - **Sem sessão:** `/login` → 200; `/dashboard`, `/occurrences`, `/products` → 307 para `/login`; todas as APIs → `{"error":"Unauthorized"}` 401.
+  - **ADMIN (`admin@demo.com`):** login → 302; `/dashboard` → 200; `GET /api/dashboard` → `totalOccurrences=6`; `GET /api/occurrences` → lista com 6 registros; `POST /api/occurrences` → 201 (id gerado); `PATCH /api/occurrences/{id}` → 200; `POST /api/products` → 201; `POST /api/prices` → 201.
+  - **SEPARADOR (`separador@demo.com`):** login → 302; `GET /api/dashboard` → 200; `POST /api/products` → `{"error":"Sem permissão"}`; `POST /api/prices` → `{"error":"Sem permissão"}`.
+- ESLint: 0 erros no código da aplicação, 4 warnings pré-existentes. TSC: exit 0. Build: 20 rotas, clean. Prisma migrate: schema up to date.
 
 ### Rodada 2B.5 — Remoção da Autenticação Simulada (2026-05-14)
 - `src/components/layout/user-selector.tsx` removido — dropdown de troca de usuário simulado eliminado.
