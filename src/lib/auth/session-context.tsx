@@ -1,50 +1,26 @@
 "use client";
 
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { SessionProvider as NextAuthProvider, useSession as useNextAuthSession } from "next-auth/react";
+import type { Session } from "next-auth";
+import type { ReactNode } from "react";
 import type { SessionUser } from "./types";
-
-interface SessionContextType {
-  user: SessionUser | null;
-  setUser: (user: SessionUser) => void;
-  users: SessionUser[];
-}
-
-const SessionContext = createContext<SessionContextType>({
-  user: null,
-  setUser: () => {},
-  users: [],
-});
 
 export function SessionProvider({
   children,
-  users,
+  session,
 }: {
   children: ReactNode;
-  users: SessionUser[];
+  session?: Session | null;
 }) {
-  const [user, setUserState] = useState<SessionUser | null>(() => {
-    if (typeof window === "undefined") return null;
-    const stored = localStorage.getItem("move-avarias-user");
-    if (stored) {
-      const parsed = JSON.parse(stored) as SessionUser;
-      const found = users.find((u) => u.id === parsed.id);
-      if (found) return found;
-    }
-    return users[0] ?? null;
-  });
-
-  const setUser = (u: SessionUser) => {
-    setUserState(u);
-    localStorage.setItem("move-avarias-user", JSON.stringify(u));
-  };
-
   return (
-    <SessionContext.Provider value={{ user, setUser, users }}>
+    <NextAuthProvider session={session}>
       {children}
-    </SessionContext.Provider>
+    </NextAuthProvider>
   );
 }
 
-export function useSession() {
-  return useContext(SessionContext);
+export function useSession(): { user: SessionUser | null } {
+  const { data } = useNextAuthSession();
+  if (!data?.user) return { user: null };
+  return { user: data.user as SessionUser };
 }

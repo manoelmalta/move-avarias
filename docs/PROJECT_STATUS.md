@@ -15,7 +15,7 @@
 | **Framework** | Next.js 16.2.4 (App Router, Turbopack) |
 | **Linguagem** | TypeScript 5.x (strict mode ativado) |
 | **Banco de dados** | SQLite local via `better-sqlite3` + Prisma v7 com adapter explícito |
-| **Autenticação** | Auth.js v5 (JWT) com Credentials Provider — login real com email/senha bcrypt. Proxy protege rotas. APIs retornam 401 sem sessão. UserSelector ainda temporário (remoção em 2B.5) |
+| **Autenticação** | Auth.js v5 (JWT) com Credentials Provider — login real com email/senha bcrypt. Proxy protege rotas. APIs retornam 401 sem sessão. Header exibe usuário real via AuthUserMenu. UserSelector removido |
 | **Deploy previsto** | Não configurado — sem remote git, sem serviço de hospedagem definido |
 | **Gerenciador de pacotes** | npm (package-lock.json presente) |
 | **React** | 19.2.4 |
@@ -118,7 +118,7 @@ move-avarias/
 
 | Módulo | Status | Arquivos Principais | Observações |
 |---|---|---|---|
-| **Login / Autenticação** | ✅ Implementado | `src/auth.ts`, `src/proxy.ts`, `src/app/login/`, `src/components/layout/auth-user-menu.tsx` | Auth.js v5 com Credentials Provider. Login com email+senha bcrypt. JWT com `id`, `clientId`, `name`, `email`, `role`. Proxy protege todas as rotas. APIs retornam 401 sem sessão. Logout server action. UserSelector ainda temporário (2B.5) |
+| **Login / Autenticação** | ✅ Completo | `src/auth.ts`, `src/proxy.ts`, `src/app/login/`, `src/components/layout/auth-user-menu.tsx` | Auth.js v5 com Credentials Provider. Login com email+senha bcrypt. JWT com `id`, `clientId`, `name`, `email`, `role`. Proxy protege todas as rotas. APIs retornam 401 sem sessão. Logout server action. Header exibe nome/email/role reais. UserSelector removido |
 | **Dashboard** | ✅ Pronto | `src/app/dashboard/page.tsx`, `src/app/api/dashboard/route.ts` | 6 KPIs (total, abertas, em tratamento, finalizadas, itens, valor). 3 rankings: por status, tipo de avaria, origem. Totalmente conectado ao banco |
 | **Cadastro de Clientes** | ❌ Não iniciado | — | Não existe tela nem API para criar/editar clientes. O sistema usa `slug: "cliente-demo"` hardcoded em todas as rotas |
 | **Cadastro de Usuários** | ❌ Não iniciado | `src/app/api/users/route.ts` (só GET) | Existe listagem de usuários via API. Não há tela de cadastro, edição ou gestão de usuários |
@@ -247,10 +247,9 @@ move-avarias/
 
 | Local | Tipo | Descrição |
 |---|---|---|
-| `src/components/layout/user-selector.tsx` | Temporário | UserSelector ainda exibido no header — remoção prevista para Rodada 2B.5 |
-| `src/lib/auth/session-context.tsx` | Temporário | SessionProvider ainda em uso com lista de usuários para o UserSelector — será simplificado em 2B.5 |
+| `src/lib/auth/session-context.tsx` | Mantido (reescrito) | Agora envolve `next-auth/react` — exporta `SessionProvider` e `useSession` com interface compatível com os client components existentes. Sem localStorage, sem lista de usuários |
 
-> **Nota:** Slug `"cliente-demo"` foi removido de toda a aplicação (Rodadas 2B.3 e 2B.4). `clientId` é resolvido a partir de `session.user.clientId` em todas as páginas e APIs.
+> **Nota:** Slug `"cliente-demo"` foi removido de toda a aplicação (Rodadas 2B.3 e 2B.4). `clientId` é resolvido a partir de `session.user.clientId` em todas as páginas e APIs. UserSelector e localStorage removidos (Rodada 2B.5).
 | `prisma/seed.ts` | Dados demo | 1 cliente, 5 usuários, 3 produtos, 3 preços, 5 ocorrências, todos com dados fictícios |
 
 ---
@@ -436,6 +435,19 @@ Commit `6a425de` na `main`: lint zerado, `.gitignore` corrigido, governança doc
 
 ### Rodada 2B.PoC — Prova Técnica Auth.js v5 (2026-05-14)
 **Resultado: COMPATÍVEL.** next-auth 5.0.0-beta.31 instalado na branch `feat/auth-real`. Lint, tsc e build passaram com 0 erros. 18 rotas geradas (incluindo `/api/auth/[...nextauth]`). Ajuste necessário: augmentação JWT via `@auth/core/jwt`, não `next-auth/jwt`.
+
+### Rodada 2B.5 — Remoção da Autenticação Simulada (2026-05-14)
+- `src/components/layout/user-selector.tsx` removido — dropdown de troca de usuário simulado eliminado.
+- `src/lib/auth/session-context.tsx` reescrito: deixou de usar `localStorage` e lista de usuários; agora envolve `SessionProvider` e `useSession` de `next-auth/react`.
+  - `SessionProvider` repassa `session` do servidor para o contexto React da sessão real.
+  - `useSession()` retorna `{ user: SessionUser | null }` lido da sessão Auth.js — mesma interface dos consumidores anteriores, sem quebrar nenhum client component.
+- `src/app/layout.tsx` atualizado: removidos `getUsers()`, `users`, `UserSelector` e imports relacionados; `SessionProvider` agora recebe `session` do servidor; header exibe apenas `AuthUserMenu`.
+- Os 4 client components (`new-occurrence-form`, `occurrence-detail`, `products-manager`, `prices-manager`) **não foram alterados** — continuam importando `useSession` de `@/lib/auth/session-context`, mas agora recebem o usuário real da sessão Auth.js.
+- Header passa a exibir nome, email e role do usuário autenticado via `AuthUserMenu`.
+- "Usuário simulado:" eliminado do HTML de todas as páginas.
+- `localStorage` sem referências na aplicação.
+- Autenticação visual e funcional unificada na sessão real: páginas, APIs e componentes usam o mesmo `session.user`.
+- Testes manuais: `/login` sem sessão → 200; `/dashboard` sem sessão → 307; `/dashboard` com admin → 200 com "Admin Demo", "admin@demo.com", "ADMIN", "Sair"; `/login` com sessão → 302; APIs sem sessão → 401; todas as páginas protegidas com sessão → 200.
 
 ### Rodada 2B.4 — Proteção de APIs por Sessão Server-Side (2026-05-14)
 - `auth()` importado em todas as 9 rotas API funcionais: `dashboard`, `occurrences`, `occurrences/[id]`, `products`, `products/[id]`, `prices`, `parameters`, `users`, `search/product`.
