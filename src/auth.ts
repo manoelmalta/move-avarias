@@ -67,6 +67,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
       if (pathname.startsWith("/api/auth")) return true;
 
+      if (pathname.startsWith("/api/")) {
+        return isLoggedIn ? true : Response.json({ error: "Unauthorized" }, { status: 401 });
+      }
+
       if (pathname === "/login") {
         if (isLoggedIn) return Response.redirect(new URL("/dashboard", request.url));
         return true;

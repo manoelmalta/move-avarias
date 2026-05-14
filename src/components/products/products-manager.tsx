@@ -43,8 +43,8 @@ export function ProductsManager({ products: initial }: { products: Product[] }) 
     setSaving(true); setError("");
     try {
       const res = editing
-        ? await fetch(`/api/products/${editing.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user, data: form }) })
-        : await fetch("/api/products", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user, data: form }) });
+        ? await fetch(`/api/products/${editing.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data: form }) })
+        : await fetch("/api/products", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data: form }) });
 
       const json = await res.json() as { error?: string; id?: string };
       if (!res.ok) { setError(String(json.error ?? "Erro ao salvar")); return; }
@@ -59,7 +59,7 @@ export function ProductsManager({ products: initial }: { products: Product[] }) 
     await fetch(`/api/products/${p.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user, data: { active: !p.active } }),
+      body: JSON.stringify({ data: { active: !p.active } }),
     });
     router.refresh();
   };

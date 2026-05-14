@@ -3,9 +3,12 @@ import { prisma } from "@/lib/db/client";
 import { UpdateOccurrenceSchema } from "@/lib/validations/occurrence";
 import { auditFieldChanges, createAuditLog } from "@/lib/audit";
 import { hasPermission, assertPermission } from "@/lib/permissions";
-import type { SessionUser } from "@/lib/auth/types";
+import { auth } from "@/auth";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const session = await auth();
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const { id } = await params;
   const occurrence = await prisma.damageOccurrence.findUnique({
     where: { id },
@@ -28,13 +31,18 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   });
 
   if (!occurrence) return NextResponse.json({ error: "Ocorrência não encontrada" }, { status: 404 });
+  if (occurrence.clientId !== session.user.clientId) return NextResponse.json({ error: "Ocorrência não encontrada" }, { status: 404 });
   return NextResponse.json(occurrence);
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const session = await auth();
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { user } = session;
+
   const { id } = await params;
-  const body = await req.json() as { user: SessionUser; data: unknown; complete?: boolean };
-  const { user, data, complete } = body;
+  const body = await req.json() as { data: unknown; complete?: boolean };
+  const { data, complete } = body;
 
   const parsed = UpdateOccurrenceSchema.safeParse(data);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -44,6 +52,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     include: { status: true, destination: true, items: true },
   });
   if (!existing) return NextResponse.json({ error: "Ocorrência não encontrada" }, { status: 404 });
+  if (existing.clientId !== user.clientId) return NextResponse.json({ error: "Ocorrência não encontrada" }, { status: 404 });
 
   const isOwner = existing.openedByUserId === user.id;
 

@@ -15,7 +15,7 @@
 | **Framework** | Next.js 16.2.4 (App Router, Turbopack) |
 | **Linguagem** | TypeScript 5.x (strict mode ativado) |
 | **Banco de dados** | SQLite local via `better-sqlite3` + Prisma v7 com adapter explícito |
-| **Autenticação** | **Não implementada** — sistema de "usuário simulado" com dropdown no header (localStorage) |
+| **Autenticação** | Auth.js v5 (JWT) com Credentials Provider — login real com email/senha bcrypt. Proxy protege rotas. APIs retornam 401 sem sessão. UserSelector ainda temporário (remoção em 2B.5) |
 | **Deploy previsto** | Não configurado — sem remote git, sem serviço de hospedagem definido |
 | **Gerenciador de pacotes** | npm (package-lock.json presente) |
 | **React** | 19.2.4 |
@@ -118,7 +118,7 @@ move-avarias/
 
 | Módulo | Status | Arquivos Principais | Observações |
 |---|---|---|---|
-| **Login / Autenticação** | ❌ Mockado | `src/lib/auth/session-context.tsx`, `src/components/layout/user-selector.tsx` | Não existe autenticação real. O header exibe um `<Select>` que troca o usuário ativo via localStorage. Qualquer pessoa que acesse a URL pode assumir qualquer papel (ADMIN, SEPARADOR, etc.) sem senha |
+| **Login / Autenticação** | ✅ Implementado | `src/auth.ts`, `src/proxy.ts`, `src/app/login/`, `src/components/layout/auth-user-menu.tsx` | Auth.js v5 com Credentials Provider. Login com email+senha bcrypt. JWT com `id`, `clientId`, `name`, `email`, `role`. Proxy protege todas as rotas. APIs retornam 401 sem sessão. Logout server action. UserSelector ainda temporário (2B.5) |
 | **Dashboard** | ✅ Pronto | `src/app/dashboard/page.tsx`, `src/app/api/dashboard/route.ts` | 6 KPIs (total, abertas, em tratamento, finalizadas, itens, valor). 3 rankings: por status, tipo de avaria, origem. Totalmente conectado ao banco |
 | **Cadastro de Clientes** | ❌ Não iniciado | — | Não existe tela nem API para criar/editar clientes. O sistema usa `slug: "cliente-demo"` hardcoded em todas as rotas |
 | **Cadastro de Usuários** | ❌ Não iniciado | `src/app/api/users/route.ts` (só GET) | Existe listagem de usuários via API. Não há tela de cadastro, edição ou gestão de usuários |
@@ -128,7 +128,7 @@ move-avarias/
 | **Destinação Final** | ✅ Pronto | Schema + parâmetros + occurrence detail | 6 destinações pré-configuradas (Cozinha, Descarte, Destinado à Reposição, Lojas Nestor, Troca/Bonificação, Venda Promocional). `requiresStorageLocation` condicional funcional |
 | **Upload de Fotos / Evidências** | ❌ Não iniciado | — | Não existe nenhuma estrutura para upload de arquivos. Não há campo no schema, nem API, nem componente de upload |
 | **Relatórios / Exportação** | ❌ Não iniciado | — | Não existe tela de relatórios, exportação para CSV/Excel/PDF ou qualquer endpoint de exportação |
-| **Controle Multi-Cliente** | ⚠️ Parcial | Schema `Client` presente, todas as tabelas têm `clientId` | O schema está preparado para multi-tenancy. Porém todas as rotas API fixam `slug: "cliente-demo"` sem resolução dinâmica de cliente |
+| **Controle Multi-Cliente** | ⚠️ Parcial | Schema `Client` presente, todas as tabelas têm `clientId` | O schema está preparado para multi-tenancy. Páginas e APIs resolvem `clientId` a partir da sessão autenticada. Slug `"cliente-demo"` removido de toda a aplicação |
 | **Permissões / Perfis de Acesso** | ✅ Pronto | `src/lib/permissions/index.ts` | 5 perfis: SEPARADOR, LIDER, ANALISTA, GESTOR, ADMIN. 13 permissões granulares. Verificação no frontend (UI oculta elementos) e no backend (API retorna 403). Único gap: sem autenticação real, o cliente pode burlar as permissões trocando o user no dropdown |
 | **Layout / Identidade Visual** | ✅ Pronto | `src/components/layout/sidebar.tsx`, `src/app/globals.css`, `public/branding/` | Sidebar escura (#1C2333) com logo, textura de fundo e navegação. Header com UserSelector. Paleta verde (#16A34A) como cor de ação principal. Logo e background da marca presentes |
 | **Integração com Banco de Dados** | ✅ Pronto | `src/lib/db/client.ts`, `prisma/schema.prisma` | Prisma v7 com adapter `better-sqlite3`. Singleton com globalThis para hot-reload. Banco populado com dados demo funcionais |
@@ -247,22 +247,10 @@ move-avarias/
 
 | Local | Tipo | Descrição |
 |---|---|---|
-| `src/app/api/occurrences/route.ts:10,46` | Hardcoded | `slug: "cliente-demo"` — cliente fixo em todas as queries |
-| `src/app/api/occurrences/[id]/route.ts` | Hardcoded | Sem resolução de cliente — qualquer ID de ocorrência é acessível |
-| `src/app/api/products/route.ts:9,36` | Hardcoded | `slug: "cliente-demo"` |
-| `src/app/api/prices/route.ts:9,31` | Hardcoded | `slug: "cliente-demo"` |
-| `src/app/api/parameters/route.ts:5` | Hardcoded | `slug: "cliente-demo"` |
-| `src/app/api/users/route.ts:5` | Hardcoded | `slug: "cliente-demo"` |
-| `src/app/api/search/product/route.ts:7` | Hardcoded | `const clientSlug = "cliente-demo"` |
-| `src/app/api/dashboard/route.ts:5` | Hardcoded | `slug: "cliente-demo"` |
-| `src/app/occurrences/page.tsx:21,49` | Hardcoded | `slug: "cliente-demo"` |
-| `src/app/dashboard/page.tsx:7` | Hardcoded | `slug: "cliente-demo"` |
-| `src/app/products/page.tsx:5` | Hardcoded | `slug: "cliente-demo"` |
-| `src/app/prices/page.tsx:5` | Hardcoded | `slug: "cliente-demo"` |
-| `src/app/parameters/page.tsx:5` | Hardcoded | `slug: "cliente-demo"` |
-| `src/app/layout.tsx:19` | Hardcoded | `slug: "cliente-demo"` |
-| `src/lib/auth/session-context.tsx` | Mockado | Autenticação inteira é simulada — sem senha, sem token, sem sessão real |
-| `src/components/layout/user-selector.tsx` | Mockado | "Usuário simulado:" exibido explicitamente no header |
+| `src/components/layout/user-selector.tsx` | Temporário | UserSelector ainda exibido no header — remoção prevista para Rodada 2B.5 |
+| `src/lib/auth/session-context.tsx` | Temporário | SessionProvider ainda em uso com lista de usuários para o UserSelector — será simplificado em 2B.5 |
+
+> **Nota:** Slug `"cliente-demo"` foi removido de toda a aplicação (Rodadas 2B.3 e 2B.4). `clientId` é resolvido a partir de `session.user.clientId` em todas as páginas e APIs.
 | `prisma/seed.ts` | Dados demo | 1 cliente, 5 usuários, 3 produtos, 3 preços, 5 ocorrências, todos com dados fictícios |
 
 ---
@@ -448,6 +436,19 @@ Commit `6a425de` na `main`: lint zerado, `.gitignore` corrigido, governança doc
 
 ### Rodada 2B.PoC — Prova Técnica Auth.js v5 (2026-05-14)
 **Resultado: COMPATÍVEL.** next-auth 5.0.0-beta.31 instalado na branch `feat/auth-real`. Lint, tsc e build passaram com 0 erros. 18 rotas geradas (incluindo `/api/auth/[...nextauth]`). Ajuste necessário: augmentação JWT via `@auth/core/jwt`, não `next-auth/jwt`.
+
+### Rodada 2B.4 — Proteção de APIs por Sessão Server-Side (2026-05-14)
+- `auth()` importado em todas as 9 rotas API funcionais: `dashboard`, `occurrences`, `occurrences/[id]`, `products`, `products/[id]`, `prices`, `parameters`, `users`, `search/product`.
+- Sem sessão válida → API retorna `{ error: "Unauthorized" }` com status 401.
+- `authorized` callback em `src/auth.ts` atualizado: rotas `/api/*` sem sessão retornam 401 JSON diretamente (antes redirecionavam com 307 — comportamento inadequado para APIs).
+- Slug `"cliente-demo"` **removido de todas as APIs** — `clientId` agora vem de `session.user.clientId`.
+- `user` **removido do body** de todas as requisições (`POST /api/occurrences`, `POST /api/products`, `POST /api/prices`, `PATCH /api/products/[id]`, `PATCH /api/occurrences/[id]`).
+- `session.user` usado diretamente nas APIs para permissão (`assertPermission(user, ...)`), auditoria e `openedByUserId`.
+- Ownership check por `clientId` adicionado: `GET /api/occurrences/[id]` e `PATCH /api/occurrences/[id]` retornam 404 se o recurso pertencer a outro cliente; `PATCH /api/products/[id]` idem.
+- Permissões continuam retornando 403 quando insuficientes (ex: SEPARADOR tentando `product:manage` ou `price:manage`).
+- Client Components (`new-occurrence-form`, `occurrence-detail`, `products-manager`, `prices-manager`) atualizados: `user` removido do body de todos os `fetch` — APIs não aceitam mais o usuário pelo cliente.
+- UserSelector ainda temporário — remoção prevista para Rodada 2B.5.
+- Testes automatizados via curl: login real com `admin@demo.com` / `MoveReuse@2026`, todos os 9 GETs autenticados respondendo com dados corretos, POST ocorrência criada (AVR-2026-00006), PATCH ocorrência editada e concluída, POST produto criado, PATCH produto inativado, POST preço criado, 401 para requisições sem sessão, 403 para SEPARADOR tentando actions restritas, 404 para IDs inexistentes.
 
 ### Rodada 2B.3 — Middleware e clientId nas Páginas (2026-05-14)
 - `src/proxy.ts` criado: todas as rotas privadas protegidas pelo `authorized` callback do Auth.js v5.

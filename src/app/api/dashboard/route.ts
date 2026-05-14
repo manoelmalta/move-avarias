@@ -1,20 +1,22 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/client";
+import { auth } from "@/auth";
 
 export async function GET() {
-  const client = await prisma.client.findFirst({ where: { slug: "cliente-demo" } });
-  if (!client) return NextResponse.json({});
+  const session = await auth();
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const clientId = session.user.clientId;
 
   const [occurrences, statuses] = await Promise.all([
     prisma.damageOccurrence.findMany({
-      where: { clientId: client.id },
+      where: { clientId },
       include: {
         status: true,
         items: { include: { damageType: true } },
         origin: true,
       },
     }),
-    prisma.parameterStatus.findMany({ where: { clientId: client.id }, orderBy: { funnelOrder: "asc" } }),
+    prisma.parameterStatus.findMany({ where: { clientId }, orderBy: { funnelOrder: "asc" } }),
   ]);
 
   const totalOccurrences = occurrences.length;

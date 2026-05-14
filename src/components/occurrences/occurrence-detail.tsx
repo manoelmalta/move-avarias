@@ -95,7 +95,6 @@ export function OccurrenceDetail({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          user,
           data: {
             ...(canEditStatus && { statusId }),
             ...(canEditDestination && { destinationId: destinationId || null }),
