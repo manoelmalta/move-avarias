@@ -1,10 +1,11 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, ClipboardList, PackagePlus, Package, DollarSign, Settings } from "lucide-react";
+import { LayoutDashboard, ClipboardList, PackagePlus, Package, DollarSign, Settings, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useSession } from "@/lib/auth/session-context";
 
-const navItems = [
+const baseNavItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/occurrences", label: "Ocorrências", icon: ClipboardList },
   { href: "/occurrences/new", label: "Nova Ocorrência", icon: PackagePlus },
@@ -13,8 +14,14 @@ const navItems = [
   { href: "/parameters", label: "Parâmetros", icon: Settings },
 ];
 
+const adminNavItems = [
+  { href: "/users", label: "Usuários", icon: Users },
+];
+
 export function Sidebar() {
   const pathname = usePathname();
+  const { user } = useSession();
+  const navItems = user?.role === "ADMIN" ? [...baseNavItems, ...adminNavItems] : baseNavItems;
   return (
     <aside
       className="w-60 shrink-0 h-full flex flex-col relative overflow-hidden"
