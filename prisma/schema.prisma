@@ -1,0 +1,197 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Client {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users               User[]
+  products            Product[]
+  productPrices       ProductPrice[]
+  occurrences         DamageOccurrence[]
+  occurrenceItems     DamageOccurrenceItem[]
+  parameterOrigins    ParameterOrigin[]
+  parameterDamageTypes ParameterDamageType[]
+  parameterStatuses   ParameterStatus[]
+  parameterDestinations ParameterDestination[]
+  auditLogs           AuditLog[]
+}
+
+model User {
+  id        String   @id @default(cuid())
+  clientId  String
+  name      String
+  email     String
+  role      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  client      Client             @relation(fields: [clientId], references: [id])
+  occurrences DamageOccurrence[]
+  auditLogs   AuditLog[]
+
+  @@unique([clientId, email])
+}
+
+model Product {
+  id           String   @id @default(cuid())
+  clientId     String
+  ean          String
+  dun          String?
+  internalCode String
+  description  String
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  client          Client                 @relation(fields: [clientId], references: [id])
+  prices          ProductPrice[]
+  occurrenceItems DamageOccurrenceItem[]
+
+  @@unique([clientId, ean])
+  @@unique([clientId, internalCode])
+}
+
+model ProductPrice {
+  id         String    @id @default(cuid())
+  clientId   String
+  productId  String
+  unitValue  Float
+  validFrom  DateTime
+  validTo    DateTime?
+  sourceNote String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  client  Client  @relation(fields: [clientId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+}
+
+model DamageOccurrence {
+  id                     String    @id @default(cuid())
+  clientId               String
+  occurrenceCode         String    @unique
+  openedByUserId         String
+  originId               String
+  statusId               String
+  destinationId          String?
+  description            String
+  destinationObservation String?
+  storageLocation        String?
+  notes                  String?
+  completedAt            DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  client      Client                 @relation(fields: [clientId], references: [id])
+  openedBy    User                   @relation(fields: [openedByUserId], references: [id])
+  origin      ParameterOrigin        @relation(fields: [originId], references: [id])
+  status      ParameterStatus        @relation(fields: [statusId], references: [id])
+  destination ParameterDestination?  @relation(fields: [destinationId], references: [id])
+  items       DamageOccurrenceItem[]
+  auditLogs   AuditLog[]
+}
+
+model DamageOccurrenceItem {
+  id             String    @id @default(cuid())
+  clientId       String
+  occurrenceId   String
+  productId      String
+  barcodeInput   String?
+  quantity       Float
+  unitValue      Float
+  totalValue     Float
+  batch          String?
+  expirationDate DateTime?
+  damageTypeId   String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  client     Client           @relation(fields: [clientId], references: [id])
+  occurrence DamageOccurrence @relation(fields: [occurrenceId], references: [id])
+  product    Product          @relation(fields: [productId], references: [id])
+  damageType ParameterDamageType @relation(fields: [damageTypeId], references: [id])
+}
+
+model ParameterOrigin {
+  id        String   @id @default(cuid())
+  clientId  String
+  name      String
+  active    Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  client      Client             @relation(fields: [clientId], references: [id])
+  occurrences DamageOccurrence[]
+}
+
+model ParameterDamageType {
+  id        String   @id @default(cuid())
+  clientId  String
+  name      String
+  active    Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  client          Client                 @relation(fields: [clientId], references: [id])
+  occurrenceItems DamageOccurrenceItem[]
+}
+
+model ParameterStatus {
+  id          String   @id @default(cuid())
+  clientId    String
+  name        String
+  funnelOrder Int      @default(0)
+  isFinal     Boolean  @default(false)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  client      Client             @relation(fields: [clientId], references: [id])
+  occurrences DamageOccurrence[]
+}
+
+model ParameterDestination {
+  id                    String   @id @default(cuid())
+  clientId              String
+  name                  String
+  description           String?
+  requiresStorageLocation Boolean @default(false)
+  active                Boolean  @default(true)
+  sortOrder             Int      @default(0)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  client      Client             @relation(fields: [clientId], references: [id])
+  occurrences DamageOccurrence[]
+}
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  clientId     String
+  entityType   String
+  entityId     String
+  occurrenceId String?
+  userId       String
+  action       String
+  fieldName    String?
+  oldValue     String?
+  newValue     String?
+  createdAt    DateTime @default(now())
+
+  client     Client            @relation(fields: [clientId], references: [id])
+  user       User              @relation(fields: [userId], references: [id])
+  occurrence DamageOccurrence? @relation(fields: [occurrenceId], references: [id])
+}
