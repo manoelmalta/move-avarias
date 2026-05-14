@@ -13,7 +13,8 @@ type Permission =
   | "product:manage"
   | "price:manage"
   | "parameter:manage"
-  | "dashboard:indicators";
+  | "dashboard:indicators"
+  | "user:manage";
 
 const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   SEPARADOR: [
@@ -59,6 +60,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "product:manage",
     "price:manage",
     "parameter:manage",
+    "user:manage",
   ],
 };
 
