@@ -449,6 +449,17 @@ Commit `6a425de` na `main`: lint zerado, `.gitignore` corrigido, governança doc
 ### Rodada 2B.PoC — Prova Técnica Auth.js v5 (2026-05-14)
 **Resultado: COMPATÍVEL.** next-auth 5.0.0-beta.31 instalado na branch `feat/auth-real`. Lint, tsc e build passaram com 0 erros. 18 rotas geradas (incluindo `/api/auth/[...nextauth]`). Ajuste necessário: augmentação JWT via `@auth/core/jwt`, não `next-auth/jwt`.
 
+### Rodada 2B.2 — Login Real com Credentials (2026-05-14)
+- Login real implementado: Auth.js v5 Credentials Provider ativo com validação real de email/senha.
+- `authorize()` em `src/auth.ts` consulta o banco via Prisma, valida `active`, `passwordHash` e compara senha com bcryptjs.
+- Página `/login` criada (`src/app/login/page.tsx` + `src/app/login/login-form.tsx`).
+- Sessão JWT contém: `id`, `clientId`, `name`, `email`, `role`.
+- Componente `AuthUserMenu` adicionado ao header: exibe nome, email, role e botão de logout (server action).
+- Senha demo local autorizada: `MoveReuse@2026` (todos os 5 usuários).
+- APIs ainda **não protegidas** nesta rodada — refatoração prevista para 2B.4.
+- UserSelector **permanece temporariamente** — remoção prevista para 2B.5.
+- Rotas ainda **não protegidas por middleware** — previsto para 2B.3.
+
 ### Rodada 2B.1 — Fundação de Senha (2026-05-14)
 - Migration `20260514131137_add_user_password_hash`: campo `passwordHash String?` adicionado ao modelo `User` sem reset de banco.
 - `prisma/seed.ts` atualizado com bcryptjs — 5 usuários demo recebem hash bcrypt (cost 12) da senha demo `MoveReuse@2026`.

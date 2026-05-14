@@ -5,6 +5,7 @@ import { SessionProvider } from "@/lib/auth/session-context";
 import { prisma } from "@/lib/db/client";
 import { Sidebar } from "@/components/layout/sidebar";
 import { UserSelector } from "@/components/layout/user-selector";
+import { AuthUserMenu } from "@/components/layout/auth-user-menu";
 import type { SessionUser } from "@/lib/auth/types";
 import type { UserRole } from "@/lib/auth/types";
 
@@ -43,7 +44,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <div className="flex-1 flex flex-col min-w-0">
               <header className="h-14 border-b flex items-center justify-between px-6 bg-card shrink-0 shadow-sm">
                 <div />
-                <UserSelector />
+                <div className="flex items-center gap-4">
+                  <UserSelector />
+                  <AuthUserMenu />
+                </div>
               </header>
               <main className="flex-1 overflow-auto p-6 bg-muted/40">
                 {children}
