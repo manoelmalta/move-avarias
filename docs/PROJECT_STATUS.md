@@ -438,3 +438,27 @@ Para **demonstração interna** em rede local com supervisão, é utilizável ho
 ---
 
 *Diagnóstico gerado via leitura completa do código — nenhum arquivo foi alterado.*
+
+---
+
+## 13. Histórico de Rodadas de Implementação
+
+### Rodada 1 — Baseline e Governança (2026-05-14)
+Commit `6a425de` na `main`: lint zerado, `.gitignore` corrigido, governança documentada (`AGENTS.md`, `docs/CHANGE_PROCESS.md`, `docs/BACKUP_POLICY.md`, `docs/TESTING_CHECKLIST.md`, `.env.example`).
+
+### Rodada 2B.PoC — Prova Técnica Auth.js v5 (2026-05-14)
+**Resultado: COMPATÍVEL.** next-auth 5.0.0-beta.31 instalado na branch `feat/auth-real`. Lint, tsc e build passaram com 0 erros. 18 rotas geradas (incluindo `/api/auth/[...nextauth]`). Ajuste necessário: augmentação JWT via `@auth/core/jwt`, não `next-auth/jwt`.
+
+### Rodada 2B.1 — Fundação de Senha (2026-05-14)
+- Migration `20260514131137_add_user_password_hash`: campo `passwordHash String?` adicionado ao modelo `User` sem reset de banco.
+- `prisma/seed.ts` atualizado com bcryptjs — 5 usuários demo recebem hash bcrypt (cost 12) da senha demo `MoveReuse@2026`.
+- `src/auth.ts` e `src/app/api/auth/[...nextauth]/route.ts` criados (config mínima, `authorize()` retorna null — sem login real ainda).
+- `.env.example` atualizado com `AUTH_SECRET` e `AUTH_URL`.
+
+**Estado atual da autenticação:**
+- Auth.js v5 instalado e compilando.
+- Banco preparado com `passwordHash` preenchido para todos os usuários demo.
+- Login real ainda NÃO está implementado.
+- UserSelector ainda permanece temporariamente (remoção prevista para Rodada 2B.5).
+- Rotas ainda NÃO protegidas (middleware previsto para Rodada 2B.3).
+- Branch de trabalho: `feat/auth-real` (não mergeada na `main`).

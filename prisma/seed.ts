@@ -1,11 +1,14 @@
 import { PrismaClient } from "../src/generated/prisma";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+import bcrypt from "bcryptjs";
 
 const adapter = new PrismaBetterSqlite3({ url: "file:./dev.db" });
 const prisma = new PrismaClient({ adapter } as ConstructorParameters<typeof PrismaClient>[0]);
 
 async function main() {
   console.log("Iniciando seed...");
+
+  const passwordHash = await bcrypt.hash("MoveReuse@2026", 12);
 
   const client = await prisma.client.upsert({
     where: { slug: "cliente-demo" },
@@ -16,28 +19,28 @@ async function main() {
   const users = await Promise.all([
     prisma.user.upsert({
       where: { clientId_email: { clientId: client.id, email: "admin@demo.com" } },
-      update: {},
-      create: { clientId: client.id, name: "Admin Demo", email: "admin@demo.com", role: "ADMIN" },
+      update: { passwordHash },
+      create: { clientId: client.id, name: "Admin Demo", email: "admin@demo.com", role: "ADMIN", passwordHash },
     }),
     prisma.user.upsert({
       where: { clientId_email: { clientId: client.id, email: "gestor@demo.com" } },
-      update: {},
-      create: { clientId: client.id, name: "Gestor Demo", email: "gestor@demo.com", role: "GESTOR" },
+      update: { passwordHash },
+      create: { clientId: client.id, name: "Gestor Demo", email: "gestor@demo.com", role: "GESTOR", passwordHash },
     }),
     prisma.user.upsert({
       where: { clientId_email: { clientId: client.id, email: "analista@demo.com" } },
-      update: {},
-      create: { clientId: client.id, name: "Analista Demo", email: "analista@demo.com", role: "ANALISTA" },
+      update: { passwordHash },
+      create: { clientId: client.id, name: "Analista Demo", email: "analista@demo.com", role: "ANALISTA", passwordHash },
     }),
     prisma.user.upsert({
       where: { clientId_email: { clientId: client.id, email: "lider@demo.com" } },
-      update: {},
-      create: { clientId: client.id, name: "Líder Demo", email: "lider@demo.com", role: "LIDER" },
+      update: { passwordHash },
+      create: { clientId: client.id, name: "Líder Demo", email: "lider@demo.com", role: "LIDER", passwordHash },
     }),
     prisma.user.upsert({
       where: { clientId_email: { clientId: client.id, email: "separador@demo.com" } },
-      update: {},
-      create: { clientId: client.id, name: "Separador Demo", email: "separador@demo.com", role: "SEPARADOR" },
+      update: { passwordHash },
+      create: { clientId: client.id, name: "Separador Demo", email: "separador@demo.com", role: "SEPARADOR", passwordHash },
     }),
   ]);
 
