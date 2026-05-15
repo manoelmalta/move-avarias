@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/auth/session-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,7 +15,14 @@ import { Plus, Trash2, Search, Loader2 } from "lucide-react";
 
 interface Origin { id: string; name: string }
 interface DamageType { id: string; name: string }
-interface ProductFound { id: string; internalCode: string; description: string; ean: string; dun: string | null; unitValue: number | null }
+interface ProductFound {
+  id: string;
+  internalCode: string;
+  description: string;
+  ean: string;
+  dun: string | null;
+  unitValue: number | null;
+}
 
 interface OccurrenceItem {
   productId: string;
@@ -50,8 +57,72 @@ export function NewOccurrenceForm({ origins, damageTypes }: { origins: Origin[];
   const [foundProduct, setFoundProduct] = useState<ProductFound | null>(null);
   const [productError, setProductError] = useState("");
 
+  // Autocomplete state
+  const [suggestions, setSuggestions] = useState<ProductFound[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setShowDropdown(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const fetchSuggestions = useCallback(async (term: string) => {
+    if (term.length < 3) {
+      setSuggestions([]);
+      setShowDropdown(false);
+      return;
+    }
+    setLoadingSuggestions(true);
+    try {
+      const res = await fetch(`/api/search/products?q=${encodeURIComponent(term)}`);
+      if (!res.ok) { setSuggestions([]); return; }
+      const data = await res.json() as ProductFound[];
+      setSuggestions(data);
+      setShowDropdown(data.length > 0);
+    } catch {
+      setSuggestions([]);
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  }, []);
+
+  const handleBarcodeChange = (value: string) => {
+    setBarcode(value);
+    setFoundProduct(null);
+    setProductError("");
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    if (value.trim().length >= 3) {
+      debounceRef.current = setTimeout(() => fetchSuggestions(value.trim()), 300);
+    } else {
+      setSuggestions([]);
+      setShowDropdown(false);
+    }
+  };
+
+  const selectSuggestion = (p: ProductFound) => {
+    setFoundProduct(p);
+    setBarcode(p.internalCode);
+    setSuggestions([]);
+    setShowDropdown(false);
+    setProductError("");
+  };
+
   const searchProduct = async () => {
     if (!barcode.trim()) return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    setShowDropdown(false);
+    setSuggestions([]);
     setSearching(true);
     setProductError("");
     setFoundProduct(null);
@@ -81,6 +152,7 @@ export function NewOccurrenceForm({ origins, damageTypes }: { origins: Origin[];
       damageTypeId,
     }]);
     setBarcode(""); setQuantity(1); setBatch(""); setExpirationDate(""); setDamageTypeId(""); setFoundProduct(null);
+    setSuggestions([]); setShowDropdown(false);
   };
 
   const removeItem = (index: number) => setItems((prev) => prev.filter((_, i) => i !== index));
@@ -153,17 +225,67 @@ export function NewOccurrenceForm({ origins, damageTypes }: { origins: Origin[];
       <Card>
         <CardHeader><CardTitle>Adicionar Produto</CardTitle></CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex gap-2">
-            <Input
-              placeholder="EAN / DUN / Código interno..."
-              value={barcode}
-              onChange={(e) => setBarcode(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && searchProduct()}
-              className="flex-1"
-            />
-            <Button type="button" variant="outline" onClick={searchProduct} disabled={searching}>
-              {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-            </Button>
+          <div ref={containerRef} className="relative">
+            <div className="flex gap-2">
+              <Input
+                placeholder="EAN / DUN / Código interno / Descrição..."
+                value={barcode}
+                onChange={(e) => handleBarcodeChange(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") { e.preventDefault(); searchProduct(); }
+                  if (e.key === "Escape") { setShowDropdown(false); setSuggestions([]); }
+                }}
+                className="flex-1"
+              />
+              <Button type="button" variant="outline" onClick={searchProduct} disabled={searching}>
+                {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+              </Button>
+            </div>
+
+            {/* Autocomplete dropdown */}
+            {showDropdown && (
+              <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-50 rounded-md border bg-popover shadow-md">
+                {loadingSuggestions ? (
+                  <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Buscando…
+                  </div>
+                ) : suggestions.length === 0 ? (
+                  <p className="px-3 py-2 text-sm text-muted-foreground">Nenhum produto encontrado</p>
+                ) : (
+                  <ul className="max-h-64 overflow-y-auto py-1">
+                    {suggestions.map((p) => (
+                      <li key={p.id}>
+                        <button
+                          type="button"
+                          className="w-full px-3 py-2 text-left hover:bg-accent focus:bg-accent focus:outline-none"
+                          onMouseDown={(e) => { e.preventDefault(); selectSuggestion(p); }}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="font-mono text-xs shrink-0">{p.internalCode}</Badge>
+                            <span className="text-sm font-medium truncate">{p.description}</span>
+                            {p.unitValue != null && (
+                              <span className="ml-auto text-xs text-muted-foreground shrink-0">{formatCurrency(p.unitValue)}</span>
+                            )}
+                          </div>
+                          <div className="mt-0.5 flex gap-3 text-xs text-muted-foreground">
+                            <span>EAN: {p.ean.startsWith("SEM-EAN-") ? "—" : p.ean}</span>
+                            {p.dun && <span>DUN: {p.dun}</span>}
+                          </div>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+
+            {/* Loading indicator while fetching suggestions (no dropdown yet) */}
+            {loadingSuggestions && !showDropdown && (
+              <div className="absolute right-12 top-1/2 -translate-y-1/2">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+              </div>
+            )}
           </div>
 
           {productError && <p className="text-sm text-destructive">{productError}</p>}
