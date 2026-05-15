@@ -4,7 +4,7 @@ export const OccurrenceItemSchema = z.object({
   productId: z.string().min(1, "Produto obrigatório"),
   barcodeInput: z.string().optional(),
   quantity: z.number().positive("Quantidade deve ser maior que zero"),
-  unitValue: z.number().positive("Valor unitário deve ser maior que zero"),
+  unitValue: z.number().min(0, "Valor unitário inválido"),
   totalValue: z.number(),
   batch: z.string().optional(),
   expirationDate: z.string().optional(),

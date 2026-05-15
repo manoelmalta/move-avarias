@@ -188,8 +188,22 @@ export function NewOccurrenceForm({ origins, damageTypes }: { origins: Origin[];
           },
         }),
       });
-      const data = await res.json() as { id: string; error?: string };
-      if (!res.ok) { setError(String(data.error ?? "Erro ao salvar")); return; }
+      const data = await res.json() as { id: string; error?: string | { formErrors?: string[]; fieldErrors?: Record<string, string[]> } };
+      if (!res.ok) {
+        const err = data.error;
+        if (typeof err === "string") {
+          setError(err);
+        } else if (err && typeof err === "object") {
+          const first =
+            err.formErrors?.[0] ??
+            Object.values(err.fieldErrors ?? {})[0]?.[0] ??
+            "Não foi possível salvar a ocorrência.";
+          setError(first);
+        } else {
+          setError("Não foi possível salvar a ocorrência.");
+        }
+        return;
+      }
       router.push(`/occurrences/${data.id}`);
     } catch { setError("Erro de rede"); }
     finally { setSaving(false); }
