@@ -56,3 +56,7 @@ src/generated/prisma/
 
 # arquivos de importação — nunca versionar dados do cliente
 imports/
+
+# planilhas Excel locais e arquivos temporários do Office
+*.xlsx
+~$*
