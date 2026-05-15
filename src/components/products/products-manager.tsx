@@ -28,13 +28,15 @@ export function ProductsManager({ products: initial }: { products: Product[] }) 
   const { user } = useSession();
   const canManage = user ? hasPermission(user, "product:manage") : false;
 
-  const [products] = useState(initial);
+  const [products, setProducts] = useState(initial);
   const [filterTerm, setFilterTerm] = useState("");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [form, setForm] = useState({ ean: "", dun: "", internalCode: "", description: "" });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [toggleError, setToggleError] = useState("");
 
   const filtered = useMemo(() => {
     const term = filterTerm.trim().toLowerCase();
@@ -61,19 +63,51 @@ export function ProductsManager({ products: initial }: { products: Product[] }) 
       const json = await res.json() as { error?: string; id?: string };
       if (!res.ok) { setError(String(json.error ?? "Erro ao salvar")); return; }
       setOpen(false);
-      router.refresh();
+      if (editing) {
+        setProducts((prev) => prev.map((p) => p.id === editing.id
+          ? { ...p, ean: form.ean, dun: form.dun || null, internalCode: form.internalCode, description: form.description }
+          : p
+        ));
+      } else if (json.id) {
+        setProducts((prev) => [...prev, {
+          id: json.id!,
+          ean: form.ean,
+          dun: form.dun || null,
+          internalCode: form.internalCode,
+          description: form.description,
+          active: true,
+          currentPrice: null,
+        }]);
+      } else {
+        router.refresh();
+      }
     } catch { setError("Erro de rede"); }
     finally { setSaving(false); }
   };
 
   const toggleActive = async (p: Product) => {
-    if (!user || !canManage) return;
-    await fetch(`/api/products/${p.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ data: { active: !p.active } }),
-    });
-    router.refresh();
+    if (!user || !canManage || togglingId === p.id) return;
+    setTogglingId(p.id);
+    setToggleError("");
+    const newActive = !p.active;
+    setProducts((prev) => prev.map((product) => product.id === p.id ? { ...product, active: newActive } : product));
+    try {
+      const res = await fetch(`/api/products/${p.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: { active: newActive } }),
+      });
+      if (!res.ok) {
+        setProducts((prev) => prev.map((product) => product.id === p.id ? { ...product, active: p.active } : product));
+        const json = await res.json() as { error?: string };
+        setToggleError(String(json.error ?? "Erro ao atualizar status"));
+      }
+    } catch {
+      setProducts((prev) => prev.map((product) => product.id === p.id ? { ...product, active: p.active } : product));
+      setToggleError("Erro de rede ao atualizar status");
+    } finally {
+      setTogglingId(null);
+    }
   };
 
   return (
@@ -105,6 +139,8 @@ export function ProductsManager({ products: initial }: { products: Product[] }) 
           {filtered.length} de {products.length} produtos
         </span>
       </div>
+
+      {toggleError && <p className="text-sm text-destructive">{toggleError}</p>}
 
       <Card>
         <CardContent className="p-0">
@@ -139,7 +175,9 @@ export function ProductsManager({ products: initial }: { products: Product[] }) 
                     {canManage && (
                       <TableCell className="flex gap-2">
                         <Button size="sm" variant="ghost" onClick={() => openEdit(p)}><Pencil className="h-3.5 w-3.5" /></Button>
-                        <Button size="sm" variant="ghost" onClick={() => toggleActive(p)}>{p.active ? "Inativar" : "Ativar"}</Button>
+                        <Button size="sm" variant="ghost" onClick={() => toggleActive(p)} disabled={togglingId === p.id}>
+                          {togglingId === p.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : (p.active ? "Inativar" : "Ativar")}
+                        </Button>
                       </TableCell>
                     )}
                   </TableRow>
