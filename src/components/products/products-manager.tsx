@@ -1,9 +1,9 @@
 "use client";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/auth/session-context";
 import { hasPermission } from "@/lib/permissions";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatCurrency } from "@/lib/utils";
-import { Plus, Pencil, Loader2 } from "lucide-react";
+import { Plus, Pencil, Loader2, X } from "lucide-react";
 
 interface Product {
   id: string;
@@ -28,12 +28,24 @@ export function ProductsManager({ products: initial }: { products: Product[] }) 
   const { user } = useSession();
   const canManage = user ? hasPermission(user, "product:manage") : false;
 
-  const [products, setProducts] = useState(initial);
+  const [products] = useState(initial);
+  const [filterTerm, setFilterTerm] = useState("");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [form, setForm] = useState({ ean: "", dun: "", internalCode: "", description: "" });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  const filtered = useMemo(() => {
+    const term = filterTerm.trim().toLowerCase();
+    if (!term) return products;
+    return products.filter((p) =>
+      p.description.toLowerCase().includes(term) ||
+      p.internalCode.toLowerCase().includes(term) ||
+      p.ean.toLowerCase().includes(term) ||
+      (p.dun?.toLowerCase().includes(term) ?? false)
+    );
+  }, [products, filterTerm]);
 
   const openNew = () => { setEditing(null); setForm({ ean: "", dun: "", internalCode: "", description: "" }); setError(""); setOpen(true); };
   const openEdit = (p: Product) => { setEditing(p); setForm({ ean: p.ean, dun: p.dun ?? "", internalCode: p.internalCode, description: p.description }); setError(""); setOpen(true); };
@@ -71,6 +83,29 @@ export function ProductsManager({ products: initial }: { products: Product[] }) 
         {canManage && <Button onClick={openNew}><Plus className="h-4 w-4" />Novo Produto</Button>}
       </div>
 
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1 max-w-md">
+          <Input
+            placeholder="Buscar por descrição, código, EAN ou DUN..."
+            value={filterTerm}
+            onChange={(e) => setFilterTerm(e.target.value)}
+          />
+          {filterTerm && (
+            <button
+              type="button"
+              onClick={() => setFilterTerm("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              aria-label="Limpar filtro"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+        <span className="text-sm text-muted-foreground whitespace-nowrap">
+          {filtered.length} de {products.length} produtos
+        </span>
+      </div>
+
       <Card>
         <CardContent className="p-0">
           <Table>
@@ -86,22 +121,30 @@ export function ProductsManager({ products: initial }: { products: Product[] }) 
               </TableRow>
             </TableHeader>
             <TableBody>
-              {products.map((p) => (
-                <TableRow key={p.id}>
-                  <TableCell className="font-mono text-sm">{p.internalCode}</TableCell>
-                  <TableCell className="text-sm font-medium">{p.description}</TableCell>
-                  <TableCell className="font-mono text-xs text-muted-foreground">{p.ean}</TableCell>
-                  <TableCell className="font-mono text-xs text-muted-foreground">{p.dun ?? "-"}</TableCell>
-                  <TableCell className="text-sm">{p.currentPrice != null ? formatCurrency(p.currentPrice) : <span className="text-muted-foreground">Sem preço</span>}</TableCell>
-                  <TableCell><Badge variant={p.active ? "success" : "secondary"}>{p.active ? "Ativo" : "Inativo"}</Badge></TableCell>
-                  {canManage && (
-                    <TableCell className="flex gap-2">
-                      <Button size="sm" variant="ghost" onClick={() => openEdit(p)}><Pencil className="h-3.5 w-3.5" /></Button>
-                      <Button size="sm" variant="ghost" onClick={() => toggleActive(p)}>{p.active ? "Inativar" : "Ativar"}</Button>
-                    </TableCell>
-                  )}
+              {filtered.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={canManage ? 7 : 6} className="text-center text-muted-foreground py-8">
+                    Nenhum produto encontrado para este filtro.
+                  </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                filtered.map((p) => (
+                  <TableRow key={p.id}>
+                    <TableCell className="font-mono text-sm">{p.internalCode}</TableCell>
+                    <TableCell className="text-sm font-medium">{p.description}</TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">{p.ean}</TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">{p.dun ?? "-"}</TableCell>
+                    <TableCell className="text-sm">{p.currentPrice != null ? formatCurrency(p.currentPrice) : <span className="text-muted-foreground">Sem preço</span>}</TableCell>
+                    <TableCell><Badge variant={p.active ? "success" : "secondary"}>{p.active ? "Ativo" : "Inativo"}</Badge></TableCell>
+                    {canManage && (
+                      <TableCell className="flex gap-2">
+                        <Button size="sm" variant="ghost" onClick={() => openEdit(p)}><Pencil className="h-3.5 w-3.5" /></Button>
+                        <Button size="sm" variant="ghost" onClick={() => toggleActive(p)}>{p.active ? "Inativar" : "Ativar"}</Button>
+                      </TableCell>
+                    )}
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>

@@ -2,22 +2,35 @@ import { prisma } from "@/lib/db/client";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { ProductsManager } from "@/components/products/products-manager";
-import { getCurrentPrice } from "@/lib/pricing";
 
 async function getProducts(clientId: string) {
-  const products = await prisma.product.findMany({
-    where: { clientId },
-    orderBy: { internalCode: "asc" },
-  });
+  const now = new Date();
 
-  const withPrices = await Promise.all(
-    products.map(async (p) => ({
-      ...p,
-      currentPrice: await getCurrentPrice(p.id, clientId),
-    }))
-  );
+  const [products, prices] = await Promise.all([
+    prisma.product.findMany({
+      where: { clientId },
+      orderBy: { internalCode: "asc" },
+    }),
+    prisma.productPrice.findMany({
+      where: {
+        clientId,
+        validFrom: { lte: now },
+        OR: [{ validTo: null }, { validTo: { gte: now } }],
+      },
+      orderBy: { validFrom: "desc" },
+      select: { productId: true, unitValue: true },
+    }),
+  ]);
 
-  return withPrices;
+  const priceMap = new Map<string, number>();
+  for (const price of prices) {
+    if (!priceMap.has(price.productId)) priceMap.set(price.productId, price.unitValue);
+  }
+
+  return products.map((p) => ({
+    ...p,
+    currentPrice: priceMap.get(p.id) ?? null,
+  }));
 }
 
 export default async function ProductsPage() {
