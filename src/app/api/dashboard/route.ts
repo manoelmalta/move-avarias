@@ -1,67 +1,96 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/client";
 import { auth } from "@/auth";
+import { hasPermission } from "@/lib/permissions";
+import type { DashboardOccurrence, DashboardParam } from "@/lib/dashboard/types";
+import { computeMetrics, applyFilters } from "@/lib/dashboard/metrics";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const clientId = session.user.clientId;
+  if (!hasPermission(session.user, "dashboard:indicators")) {
+    return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
+  }
 
-  const [occurrences, statuses] = await Promise.all([
+  const { clientId } = session.user;
+  const params = req.nextUrl.searchParams;
+
+  const where: Record<string, unknown> = { clientId };
+  if (params.get("statusId")) where.statusId = params.get("statusId");
+  if (params.get("originId")) where.originId = params.get("originId");
+  if (params.get("destinationId")) where.destinationId = params.get("destinationId");
+  if (params.get("userId")) where.openedByUserId = params.get("userId");
+  if (params.get("dateFrom") || params.get("dateTo")) {
+    const createdAt: Record<string, Date> = {};
+    if (params.get("dateFrom")) createdAt.gte = new Date(params.get("dateFrom")!);
+    if (params.get("dateTo")) createdAt.lte = new Date(params.get("dateTo") + "T23:59:59");
+    where.createdAt = createdAt;
+  }
+
+  const [rawOccurrences, statuses] = await Promise.all([
     prisma.damageOccurrence.findMany({
-      where: { clientId },
+      where,
       include: {
         status: true,
-        items: { include: { damageType: true } },
         origin: true,
+        destination: true,
+        openedBy: { select: { id: true, name: true, role: true } },
+        items: { include: { damageType: true, product: { select: { id: true, description: true } } } },
       },
+      orderBy: { createdAt: "desc" },
     }),
-    prisma.parameterStatus.findMany({ where: { clientId }, orderBy: { funnelOrder: "asc" } }),
+    prisma.parameterStatus.findMany({ where: { clientId, active: true }, orderBy: { funnelOrder: "asc" } }),
   ]);
 
-  const totalOccurrences = occurrences.length;
-  const totalItemsValue = occurrences.reduce((sum, o) => sum + o.items.reduce((s, i) => s + i.totalValue, 0), 0);
-  const totalItemsCount = occurrences.reduce((sum, o) => sum + o.items.reduce((s, i) => s + i.quantity, 0), 0);
-
-  const openStatuses = statuses.filter((s) => !s.isFinal).map((s) => s.id);
-  const openOccurrences = occurrences.filter((o) => openStatuses.includes(o.statusId)).length;
-  const finalStatus = statuses.find((s) => s.isFinal);
-  const closedOccurrences = finalStatus ? occurrences.filter((o) => o.statusId === finalStatus.id).length : 0;
-  const inProgressOccurrences = totalOccurrences - openOccurrences - closedOccurrences;
-
-  const byStatus = statuses.map((s) => ({
-    id: s.id,
-    name: s.name,
-    count: occurrences.filter((o) => o.statusId === s.id).length,
+  const occurrences: DashboardOccurrence[] = rawOccurrences.map((o) => ({
+    id: o.id,
+    occurrenceCode: o.occurrenceCode,
+    createdAtIso: o.createdAt.toISOString(),
+    completedAtIso: o.completedAt?.toISOString() ?? null,
+    statusId: o.statusId,
+    statusName: o.status.name,
+    statusIsFinal: o.status.isFinal,
+    statusFunnelOrder: o.status.funnelOrder,
+    originId: o.originId,
+    originName: o.origin.name,
+    destinationId: o.destinationId,
+    destinationName: o.destination?.name ?? null,
+    openedByUserId: o.openedByUserId,
+    openedByName: o.openedBy.name,
+    openedByRole: o.openedBy.role,
+    items: o.items.map((i) => ({
+      id: i.id,
+      productId: i.productId,
+      productDescription: i.product.description,
+      damageTypeId: i.damageTypeId,
+      damageTypeName: i.damageType.name,
+      quantity: i.quantity,
+      unitValue: i.unitValue,
+      totalValue: i.totalValue,
+    })),
   }));
 
-  const damageTypeCount: Record<string, { name: string; count: number }> = {};
-  for (const occ of occurrences) {
-    for (const item of occ.items) {
-      const id = item.damageTypeId;
-      if (!damageTypeCount[id]) damageTypeCount[id] = { name: item.damageType.name, count: 0 };
-      damageTypeCount[id]!.count += 1;
-    }
-  }
-  const topDamageTypes = Object.values(damageTypeCount).sort((a, b) => b.count - a.count).slice(0, 5);
+  const damageTypeId = params.get("damageTypeId");
+  const filtered = damageTypeId
+    ? occurrences.filter((o) => o.items.some((i) => i.damageTypeId === damageTypeId))
+    : occurrences;
 
-  const originCount: Record<string, { name: string; count: number }> = {};
-  for (const occ of occurrences) {
-    const id = occ.originId;
-    if (!originCount[id]) originCount[id] = { name: occ.origin.name, count: 0 };
-    originCount[id]!.count += 1;
-  }
-  const topOrigins = Object.values(originCount).sort((a, b) => b.count - a.count).slice(0, 5);
+  const statusParams: DashboardParam[] = statuses.map((s) => ({
+    id: s.id,
+    name: s.name,
+    order: s.funnelOrder,
+    isFinal: s.isFinal,
+  }));
 
-  return NextResponse.json({
-    totalOccurrences,
-    openOccurrences,
-    inProgressOccurrences,
-    closedOccurrences,
-    totalItemsValue,
-    totalItemsCount,
-    byStatus,
-    topDamageTypes,
-    topOrigins,
-  });
+  const metrics = computeMetrics(applyFilters(filtered, {
+    dateFrom: params.get("dateFrom") ?? "",
+    dateTo: params.get("dateTo") ?? "",
+    statusId: params.get("statusId") ?? "",
+    originId: params.get("originId") ?? "",
+    damageTypeId: params.get("damageTypeId") ?? "",
+    destinationId: params.get("destinationId") ?? "",
+    userId: params.get("userId") ?? "",
+  }), statusParams);
+
+  return NextResponse.json(metrics);
 }
