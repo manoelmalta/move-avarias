@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db/client";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
+import { hasPermission } from "@/lib/permissions";
 import { ProductsManager } from "@/components/products/products-manager";
 
 async function getProducts(clientId: string) {
@@ -36,6 +37,7 @@ async function getProducts(clientId: string) {
 export default async function ProductsPage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
+  if (!hasPermission(session.user, "product:manage")) redirect("/occurrences");
   const products = await getProducts(session.user.clientId);
   return (
     <div className="space-y-4">

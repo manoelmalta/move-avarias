@@ -152,6 +152,7 @@ export default async function OccurrencesPage({
   const { user } = session;
   const canViewAll = hasPermission(user, "occurrence:view_all");
   const canViewOwn = hasPermission(user, "occurrence:view_own");
+  const canCreate = hasPermission(user, "occurrence:create");
 
   // Should never happen given current role matrix, but defensive guard
   if (!canViewAll && !canViewOwn) redirect("/");
@@ -189,12 +190,14 @@ export default async function OccurrencesPage({
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Ocorrências</h1>
-        <Button asChild>
-          <Link href="/occurrences/new">
-            <Plus className="h-4 w-4" />
-            Nova Ocorrência
-          </Link>
-        </Button>
+        {canCreate && (
+          <Button asChild>
+            <Link href="/occurrences/new">
+              <Plus className="h-4 w-4" />
+              Nova Ocorrência
+            </Link>
+          </Button>
+        )}
       </div>
 
       {/* ── Filters ────────────────────────────────────────────────────── */}

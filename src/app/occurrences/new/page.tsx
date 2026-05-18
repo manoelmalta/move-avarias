@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db/client";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
+import { hasPermission } from "@/lib/permissions";
 import { NewOccurrenceForm } from "@/components/occurrences/new-occurrence-form";
 
 async function getFormData(clientId: string) {
@@ -14,6 +15,7 @@ async function getFormData(clientId: string) {
 export default async function NewOccurrencePage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
+  if (!hasPermission(session.user, "occurrence:create")) redirect("/occurrences");
   const data = await getFormData(session.user.clientId);
 
   return (
