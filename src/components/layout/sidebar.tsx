@@ -6,6 +6,7 @@ import {
   ClipboardList,
   PackagePlus,
   Package,
+  ScanSearch,
   DollarSign,
   Settings,
   Users,
@@ -38,6 +39,9 @@ export function Sidebar({ onMobileClose }: SidebarProps = {}) {
           : []),
         ...(hasPermission(user, "occurrence:create")
           ? [{ href: "/occurrences/new", label: "Nova Ocorrência", icon: PackagePlus }]
+          : []),
+        ...(hasPermission(user, "occurrence:view_all") || hasPermission(user, "occurrence:view_own")
+          ? [{ href: "/products/lookup", label: "Consulta de Produto", icon: ScanSearch }]
           : []),
         ...(hasPermission(user, "product:manage")
           ? [{ href: "/products", label: "Produtos", icon: Package }]
@@ -107,11 +111,16 @@ export function Sidebar({ onMobileClose }: SidebarProps = {}) {
         {/* ── Navigation ───────────────────────────────────────────────── */}
         <nav className="flex-1 p-3 space-y-0.5">
           {navItems.map(({ href, label, icon: Icon }) => {
+            // Exact-match-only routes: no sub-path activation
+            const exactMatchOnly = new Set([
+              "/dashboard",
+              "/occurrences/new",
+              "/products",
+              "/products/lookup",
+            ]);
             const isActive =
               pathname === href ||
-              (href !== "/dashboard" &&
-                pathname.startsWith(href) &&
-                href !== "/occurrences/new");
+              (!exactMatchOnly.has(href) && pathname.startsWith(href + "/"));
             return (
               <Link
                 key={href}
