@@ -9,6 +9,14 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const { user } = session;
+  const canViewAll = hasPermission(user, "occurrence:view_all");
+  const canViewOwn = hasPermission(user, "occurrence:view_own");
+
+  if (!canViewAll && !canViewOwn) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const { id } = await params;
   const occurrence = await prisma.damageOccurrence.findUnique({
     where: { id },
@@ -30,8 +38,15 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     },
   });
 
-  if (!occurrence) return NextResponse.json({ error: "Ocorrência não encontrada" }, { status: 404 });
-  if (occurrence.clientId !== session.user.clientId) return NextResponse.json({ error: "Ocorrência não encontrada" }, { status: 404 });
+  // Return 404 for both "not found" and "wrong client" to avoid leaking existence
+  if (!occurrence || occurrence.clientId !== user.clientId) {
+    return NextResponse.json({ error: "Ocorrência não encontrada" }, { status: 404 });
+  }
+  // SEPARADOR (view_own only) may only access their own occurrences
+  if (!canViewAll && occurrence.openedByUserId !== user.id) {
+    return NextResponse.json({ error: "Ocorrência não encontrada" }, { status: 404 });
+  }
+
   return NextResponse.json(occurrence);
 }
 

@@ -64,7 +64,7 @@ export function OccurrenceDetail({
 }) {
   const router = useRouter();
   const { user } = useSession();
-  const [occ, setOcc] = useState(initial);
+  const [occ] = useState(initial);
   const [saving, setSaving] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [error, setError] = useState("");
