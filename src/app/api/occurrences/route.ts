@@ -116,6 +116,10 @@ export async function POST(req: NextRequest) {
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { user } = session;
 
+  if (!hasPermission(user, "occurrence:create")) {
+    return NextResponse.json({ error: "Sem permissão para criar ocorrências" }, { status: 403 });
+  }
+
   const body = await req.json() as { data: unknown };
   const parsed = CreateOccurrenceSchema.safeParse(body.data);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });

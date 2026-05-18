@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db/client";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
+import { hasPermission } from "@/lib/permissions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
@@ -17,6 +18,7 @@ async function getParameters(clientId: string) {
 export default async function ParametersPage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
+  if (!hasPermission(session.user, "parameter:manage")) redirect("/occurrences");
   const data = await getParameters(session.user.clientId);
 
   return (

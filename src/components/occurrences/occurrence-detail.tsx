@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/auth/session-context";
-import { hasPermission, canEditOccurrence } from "@/lib/permissions";
+import { hasPermission } from "@/lib/permissions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -77,7 +77,7 @@ export function OccurrenceDetail({
   const selectedDestination = destinations.find((d) => d.id === destinationId);
   const requiresStorage = selectedDestination?.requiresStorageLocation ?? false;
 
-  const canEdit = user ? canEditOccurrence(user, occ.openedBy.id) : false;
+  const canEdit = user ? hasPermission(user, "occurrence:edit_description") : false;
   const canEditStatus = user ? hasPermission(user, "occurrence:edit_status") : false;
   const canEditDestination = user ? hasPermission(user, "occurrence:edit_destination") : false;
   const canComplete = user ? hasPermission(user, "occurrence:complete") : false;
