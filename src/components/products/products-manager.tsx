@@ -143,7 +143,7 @@ export function ProductsManager({ products: initial }: { products: Product[] }) 
       {toggleError && <p className="text-sm text-destructive">{toggleError}</p>}
 
       <Card>
-        <CardContent className="p-0">
+        <CardContent className="p-0 overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -173,10 +173,12 @@ export function ProductsManager({ products: initial }: { products: Product[] }) 
                     <TableCell className="text-sm">{p.currentPrice != null ? formatCurrency(p.currentPrice) : <span className="text-muted-foreground">Sem preço</span>}</TableCell>
                     <TableCell><Badge variant={p.active ? "success" : "secondary"}>{p.active ? "Ativo" : "Inativo"}</Badge></TableCell>
                     {canManage && (
-                      <TableCell className="flex gap-2">
-                        <Button size="sm" variant="ghost" onClick={() => openEdit(p)}><Pencil className="h-3.5 w-3.5" /></Button>
-                        <Button size="sm" variant="ghost" onClick={() => toggleActive(p)} disabled={togglingId === p.id}>
-                          {togglingId === p.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : (p.active ? "Inativar" : "Ativar")}
+                      <TableCell className="flex gap-1">
+                        <Button size="sm" variant="ghost" className="h-10 w-10 p-0" onClick={() => openEdit(p)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button size="sm" variant="ghost" className="h-10 px-3" onClick={() => toggleActive(p)} disabled={togglingId === p.id}>
+                          {togglingId === p.id ? <Loader2 className="h-4 w-4 animate-spin" /> : (p.active ? "Inativar" : "Ativar")}
                         </Button>
                       </TableCell>
                     )}

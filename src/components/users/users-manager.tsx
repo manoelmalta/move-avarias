@@ -202,7 +202,7 @@ export function UsersManager({ users: initial, currentUserId }: { users: User[];
       )}
 
       <Card>
-        <CardContent className="p-0">
+        <CardContent className="p-0 overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -235,14 +235,14 @@ export function UsersManager({ users: initial, currentUserId }: { users: User[];
                   <TableCell className="text-xs text-muted-foreground">{formatDateTime(u.updatedAt)}</TableCell>
                   <TableCell>
                     <div className="flex gap-1">
-                      <Button size="sm" variant="ghost" onClick={() => openEdit(u)} title="Editar">
-                        <Pencil className="h-3.5 w-3.5" />
+                      <Button size="sm" variant="ghost" className="h-10 w-10 p-0" onClick={() => openEdit(u)} title="Editar">
+                        <Pencil className="h-4 w-4" />
                       </Button>
-                      <Button size="sm" variant="ghost" onClick={() => handleToggleActive(u)} title={u.active ? "Inativar" : "Ativar"}>
-                        {u.active ? <UserX className="h-3.5 w-3.5" /> : <UserCheck className="h-3.5 w-3.5" />}
+                      <Button size="sm" variant="ghost" className="h-10 w-10 p-0" onClick={() => handleToggleActive(u)} title={u.active ? "Inativar" : "Ativar"}>
+                        {u.active ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
                       </Button>
-                      <Button size="sm" variant="ghost" onClick={() => openReset(u)} title="Redefinir senha">
-                        <KeyRound className="h-3.5 w-3.5" />
+                      <Button size="sm" variant="ghost" className="h-10 w-10 p-0" onClick={() => openReset(u)} title="Redefinir senha">
+                        <KeyRound className="h-4 w-4" />
                       </Button>
                     </div>
                   </TableCell>
