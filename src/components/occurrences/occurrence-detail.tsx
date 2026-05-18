@@ -228,7 +228,7 @@ export function OccurrenceDetail({
             <span className="font-bold">Total: {formatCurrency(totalValue)}</span>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>

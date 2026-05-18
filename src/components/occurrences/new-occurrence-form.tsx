@@ -359,7 +359,7 @@ export function NewOccurrenceForm({ origins, damageTypes }: { origins: Origin[];
               <span className="text-lg font-bold">Total: {formatCurrency(totalOccurrenceValue)}</span>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>

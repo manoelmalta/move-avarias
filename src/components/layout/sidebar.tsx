@@ -1,12 +1,30 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, ClipboardList, PackagePlus, Package, DollarSign, Settings, Users } from "lucide-react";
+import {
+  LayoutDashboard,
+  ClipboardList,
+  PackagePlus,
+  Package,
+  DollarSign,
+  Settings,
+  Users,
+  X,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSession } from "@/lib/auth/session-context";
 import { hasPermission } from "@/lib/permissions";
 
-export function Sidebar() {
+interface SidebarProps {
+  /**
+   * Provided when the sidebar is rendered as a mobile overlay drawer.
+   * Calling this function closes the drawer. When undefined the sidebar is
+   * in desktop mode and no close button is shown.
+   */
+  onMobileClose?: () => void;
+}
+
+export function Sidebar({ onMobileClose }: SidebarProps = {}) {
   const pathname = usePathname();
   const { user } = useSession();
 
@@ -35,9 +53,10 @@ export function Sidebar() {
           : []),
       ]
     : [];
+
   return (
     <aside
-      className="w-60 shrink-0 h-full flex flex-col relative overflow-hidden"
+      className="w-64 shrink-0 h-full flex flex-col relative overflow-hidden"
       style={{ backgroundColor: "#1C2333" }}
     >
       {/* Background texture overlay */}
@@ -52,20 +71,40 @@ export function Sidebar() {
       />
 
       <div className="relative z-10 flex flex-col h-full">
-        {/* Logo */}
-        <div className="px-5 py-4 border-b" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/branding/logo.png"
-            alt="MOVE AVARIAS"
-            className="h-10 w-auto object-contain"
-          />
-          <p className="text-xs mt-2 tracking-wide uppercase" style={{ color: "rgba(255,255,255,0.35)" }}>
-            Controle de Ocorrências
-          </p>
+        {/* ── Logo + optional mobile close button ─────────────────────── */}
+        <div
+          className="px-5 py-4 border-b flex items-start justify-between"
+          style={{ borderColor: "rgba(255,255,255,0.1)" }}
+        >
+          <div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/branding/logo.png"
+              alt="MOVE AVARIAS"
+              className="h-10 w-auto object-contain"
+            />
+            <p
+              className="text-xs mt-2 tracking-wide uppercase"
+              style={{ color: "rgba(255,255,255,0.35)" }}
+            >
+              Controle de Ocorrências
+            </p>
+          </div>
+
+          {/* Close button — only rendered in mobile overlay mode */}
+          {onMobileClose && (
+            <button
+              onClick={onMobileClose}
+              className="flex items-center justify-center h-10 w-10 rounded-md transition-colors shrink-0"
+              style={{ color: "rgba(255,255,255,0.6)" }}
+              aria-label="Fechar menu"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          )}
         </div>
 
-        {/* Navigation */}
+        {/* ── Navigation ───────────────────────────────────────────────── */}
         <nav className="flex-1 p-3 space-y-0.5">
           {navItems.map(({ href, label, icon: Icon }) => {
             const isActive =
@@ -77,6 +116,7 @@ export function Sidebar() {
               <Link
                 key={href}
                 href={href}
+                onClick={onMobileClose}
                 className={cn(
                   "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-all duration-150",
                   isActive ? "text-white" : ""
@@ -112,8 +152,11 @@ export function Sidebar() {
           })}
         </nav>
 
-        {/* Footer */}
-        <div className="px-5 py-3 border-t" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+        {/* ── Footer ───────────────────────────────────────────────────── */}
+        <div
+          className="px-5 py-3 border-t"
+          style={{ borderColor: "rgba(255,255,255,0.08)" }}
+        >
           <p className="text-xs" style={{ color: "rgba(255,255,255,0.25)" }}>
             MOVE AVARIAS · v1.0
           </p>
