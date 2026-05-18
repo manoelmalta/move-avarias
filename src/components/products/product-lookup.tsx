@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
+import { BarcodeScannerDialog } from "@/components/barcode/barcode-scanner-dialog";
 import { useSession } from "@/lib/auth/session-context";
 import { hasPermission } from "@/lib/permissions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -89,6 +90,7 @@ export function ProductLookup() {
   const [query, setQuery] = useState("");
   const [state, setState] = useState<LookupState>({ phase: "idle" });
   const [showClosed, setShowClosed] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   // ── Fetch helpers ────────────────────────────────────────────────────────────
 
@@ -142,6 +144,11 @@ export function ProductLookup() {
     if (e.key === "Enter") { e.preventDefault(); searchByQuery(); }
   };
 
+  const handleScanned = (code: string) => {
+    setQuery(code);
+    void fetchAndApply(`/api/products/lookup?query=${encodeURIComponent(code)}`, code);
+  };
+
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
@@ -174,15 +181,16 @@ export function ProductLookup() {
               }
               <span className="hidden sm:inline ml-2">Buscar</span>
             </Button>
-            {/* Placeholder for future camera integration (Phase 4D) */}
+            {/* Camera barcode scanner */}
             <Button
               variant="outline"
-              disabled
+              onClick={() => setScannerOpen(true)}
+              disabled={state.phase === "loading"}
               className="h-12 w-12 shrink-0 p-0"
-              title="Leitura por câmera — em breve"
-              aria-label="Leitura por câmera (em breve)"
+              aria-label="Ler código de barras pela câmera"
+              title="Ler código de barras pela câmera"
             >
-              <ScanBarcode className="h-5 w-5 text-muted-foreground" />
+              <ScanBarcode className="h-5 w-5" />
             </Button>
           </div>
 
@@ -283,6 +291,12 @@ export function ProductLookup() {
           onReset={reset}
         />
       )}
+
+      <BarcodeScannerDialog
+        open={scannerOpen}
+        onOpenChange={setScannerOpen}
+        onDetected={handleScanned}
+      />
     </div>
   );
 }
