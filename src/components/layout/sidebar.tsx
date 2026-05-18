@@ -4,24 +4,37 @@ import { usePathname } from "next/navigation";
 import { LayoutDashboard, ClipboardList, PackagePlus, Package, DollarSign, Settings, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSession } from "@/lib/auth/session-context";
-
-const baseNavItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/occurrences", label: "Ocorrências", icon: ClipboardList },
-  { href: "/occurrences/new", label: "Nova Ocorrência", icon: PackagePlus },
-  { href: "/products", label: "Produtos", icon: Package },
-  { href: "/prices", label: "Preços", icon: DollarSign },
-  { href: "/parameters", label: "Parâmetros", icon: Settings },
-];
-
-const adminNavItems = [
-  { href: "/users", label: "Usuários", icon: Users },
-];
+import { hasPermission } from "@/lib/permissions";
 
 export function Sidebar() {
   const pathname = usePathname();
   const { user } = useSession();
-  const navItems = user?.role === "ADMIN" ? [...baseNavItems, ...adminNavItems] : baseNavItems;
+
+  const navItems = user
+    ? [
+        ...(hasPermission(user, "dashboard:indicators")
+          ? [{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard }]
+          : []),
+        ...(hasPermission(user, "occurrence:view_all") || hasPermission(user, "occurrence:view_own")
+          ? [{ href: "/occurrences", label: "Ocorrências", icon: ClipboardList }]
+          : []),
+        ...(hasPermission(user, "occurrence:create")
+          ? [{ href: "/occurrences/new", label: "Nova Ocorrência", icon: PackagePlus }]
+          : []),
+        ...(hasPermission(user, "product:manage")
+          ? [{ href: "/products", label: "Produtos", icon: Package }]
+          : []),
+        ...(hasPermission(user, "price:manage")
+          ? [{ href: "/prices", label: "Preços", icon: DollarSign }]
+          : []),
+        ...(hasPermission(user, "parameter:manage")
+          ? [{ href: "/parameters", label: "Parâmetros", icon: Settings }]
+          : []),
+        ...(hasPermission(user, "user:manage")
+          ? [{ href: "/users", label: "Usuários", icon: Users }]
+          : []),
+      ]
+    : [];
   return (
     <aside
       className="w-60 shrink-0 h-full flex flex-col relative overflow-hidden"

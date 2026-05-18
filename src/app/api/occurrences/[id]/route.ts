@@ -69,12 +69,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!existing) return NextResponse.json({ error: "Ocorrência não encontrada" }, { status: 404 });
   if (existing.clientId !== user.clientId) return NextResponse.json({ error: "Ocorrência não encontrada" }, { status: 404 });
 
-  const isOwner = existing.openedByUserId === user.id;
-
-  if (!isOwner && !hasPermission(user, "occurrence:view_all")) {
+  // edit operations require view_all — isOwner alone does not grant edit access
+  if (!hasPermission(user, "occurrence:view_all")) {
     return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
   }
 
+  if (parsed.data.notes !== undefined && !hasPermission(user, "occurrence:edit_description")) {
+    return NextResponse.json({ error: "Sem permissão para editar observações" }, { status: 403 });
+  }
   if (parsed.data.statusId && !hasPermission(user, "occurrence:edit_status")) {
     return NextResponse.json({ error: "Sem permissão para alterar status" }, { status: 403 });
   }
