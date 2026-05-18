@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Dialog, DialogPortal, DialogOverlay, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Loader2, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Loader2, AlertTriangle, CheckCircle2, X } from "lucide-react";
 
 // ── BarcodeDetector type declaration (not yet in TypeScript's standard lib) ──
 
@@ -253,11 +253,18 @@ export function BarcodeScannerDialog({ open, onOpenChange, onDetected }: Barcode
             "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
           ].join(" ")}
         >
-          {/* Accessible title (visually shown in header) */}
+          {/* Header: title + X close button */}
           <div className="px-4 pt-4 pb-3 shrink-0 border-b bg-card flex items-center justify-between">
             <DialogTitle className="text-base font-semibold">
               Ler código de barras
             </DialogTitle>
+            <DialogPrimitive.Close
+              className="rounded-sm opacity-70 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none transition-opacity"
+              disabled={scanState === "detected"}
+              aria-label="Fechar"
+            >
+              <X className="h-5 w-5" />
+            </DialogPrimitive.Close>
           </div>
 
           {/* Camera viewport */}
@@ -331,7 +338,7 @@ export function BarcodeScannerDialog({ open, onOpenChange, onDetected }: Barcode
               onClick={handleClose}
               disabled={scanState === "detected"}
             >
-              Cancelar
+              Cancelar leitura
             </Button>
           </div>
         </DialogPrimitive.Content>
