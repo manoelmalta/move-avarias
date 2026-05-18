@@ -1,0 +1,330 @@
+"use client";
+import { useState } from "react";
+import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { formatCurrency, formatDate } from "@/lib/utils";
+import { OccurrenceQuickView } from "@/components/occurrences/occurrence-quick-view";
+import { AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react";
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+export interface SerializedOccurrence {
+  id: string;
+  occurrenceCode: string;
+  createdAt: string;
+  completedAt: string | null;
+  openedBy: { name: string };
+  origin: { name: string };
+  status: { id: string; name: string };
+  destination: { name: string } | null;
+  items: {
+    id: string;
+    quantity: number;
+    unitValue: number;
+    totalValue: number;
+    damageType: { id: string; name: string };
+  }[];
+}
+
+interface OccurrencesTableProps {
+  occurrences: SerializedOccurrence[];
+  pagination: {
+    total: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+  };
+  currentParams: Record<string, string>;
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+type BadgeVariant =
+  | "default"
+  | "secondary"
+  | "success"
+  | "warning"
+  | "info"
+  | "destructive"
+  | "purple";
+
+function getStatusVariant(statusName: string): BadgeVariant {
+  if (statusName.includes("5-") || statusName.toLowerCase().includes("finalizado"))
+    return "success";
+  if (
+    statusName.includes("4-") ||
+    statusName.toLowerCase().includes("destinação finalizada")
+  )
+    return "purple";
+  if (statusName.includes("3-") || statusName.toLowerCase().includes("definida"))
+    return "info";
+  if (statusName.includes("2-") || statusName.toLowerCase().includes("tratamento"))
+    return "warning";
+  return "secondary";
+}
+
+function buildPageUrl(
+  currentParams: Record<string, string>,
+  updates: Record<string, string>
+): string {
+  const params = new URLSearchParams(currentParams);
+  for (const [key, value] of Object.entries(updates)) {
+    if (value) params.set(key, value);
+    else params.delete(key);
+  }
+  return `/occurrences?${params.toString()}`;
+}
+
+const VALID_PAGE_SIZES = [25, 50, 100] as const;
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
+export function OccurrencesTable({
+  occurrences,
+  pagination,
+  currentParams,
+}: OccurrencesTableProps) {
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const { total, page, pageSize, totalPages } = pagination;
+
+  const rangeStart = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const rangeEnd = Math.min(page * pageSize, total);
+
+  return (
+    <>
+      {/* Quick-view drawer — rendered outside the table so it doesn't interfere */}
+      <OccurrenceQuickView
+        occurrenceId={selectedId}
+        open={selectedId !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedId(null);
+        }}
+      />
+
+      {/* ── Table card ───────────────────────────────────────────────── */}
+      <div className="rounded-lg border bg-card overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="whitespace-nowrap">Código</TableHead>
+              <TableHead className="whitespace-nowrap">Abertura</TableHead>
+              <TableHead className="whitespace-nowrap">Encerramento</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Origem</TableHead>
+              <TableHead>Destino</TableHead>
+              <TableHead>Responsável</TableHead>
+              <TableHead>Avarias</TableHead>
+              <TableHead className="text-right whitespace-nowrap">Qtd</TableHead>
+              <TableHead className="text-right whitespace-nowrap">Valor</TableHead>
+              <TableHead className="text-center w-8" title="Item sem preço">
+                <AlertTriangle className="h-4 w-4 text-amber-400 mx-auto" />
+              </TableHead>
+              <TableHead />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {occurrences.length === 0 && (
+              <TableRow>
+                <TableCell
+                  colSpan={12}
+                  className="text-center text-muted-foreground py-10"
+                >
+                  Nenhuma ocorrência encontrada.
+                </TableCell>
+              </TableRow>
+            )}
+            {occurrences.map((occ) => {
+              const totalValue = occ.items.reduce((s, i) => s + i.totalValue, 0);
+              const totalQty = occ.items.reduce((s, i) => s + i.quantity, 0);
+              const hasZeroPrice = occ.items.some((i) => i.unitValue === 0);
+              const damageTypes = [
+                ...new Map(
+                  occ.items.map((i) => [i.damageType.id, i.damageType.name])
+                ).entries(),
+              ].map(([id, name]) => ({ id, name }));
+
+              return (
+                <TableRow
+                  key={occ.id}
+                  className="cursor-pointer"
+                  onClick={() => setSelectedId(occ.id)}
+                >
+                  {/* Código */}
+                  <TableCell className="font-mono text-sm font-medium whitespace-nowrap">
+                    {occ.occurrenceCode}
+                  </TableCell>
+
+                  {/* Abertura */}
+                  <TableCell className="text-sm whitespace-nowrap">
+                    {formatDate(occ.createdAt)}
+                  </TableCell>
+
+                  {/* Encerramento */}
+                  <TableCell className="text-sm whitespace-nowrap">
+                    {occ.completedAt ? (
+                      formatDate(occ.completedAt)
+                    ) : (
+                      <span className="text-muted-foreground text-xs">Em aberto</span>
+                    )}
+                  </TableCell>
+
+                  {/* Status */}
+                  <TableCell>
+                    <Badge
+                      variant={getStatusVariant(occ.status.name)}
+                      className="text-xs whitespace-nowrap"
+                    >
+                      {occ.status.name}
+                    </Badge>
+                  </TableCell>
+
+                  {/* Origem */}
+                  <TableCell className="text-sm whitespace-nowrap">
+                    {occ.origin.name}
+                  </TableCell>
+
+                  {/* Destino */}
+                  <TableCell className="text-sm whitespace-nowrap">
+                    {occ.destination?.name ?? (
+                      <span className="text-muted-foreground text-xs">Sem destino</span>
+                    )}
+                  </TableCell>
+
+                  {/* Responsável */}
+                  <TableCell className="text-sm whitespace-nowrap">
+                    {occ.openedBy.name}
+                  </TableCell>
+
+                  {/* Avarias — all distinct types */}
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1">
+                      {damageTypes.length === 0 ? (
+                        <span className="text-muted-foreground text-xs">—</span>
+                      ) : (
+                        damageTypes.map((dt) => (
+                          <Badge key={dt.id} variant="secondary" className="text-xs">
+                            {dt.name}
+                          </Badge>
+                        ))
+                      )}
+                    </div>
+                  </TableCell>
+
+                  {/* Qtd */}
+                  <TableCell className="text-right text-sm tabular-nums">
+                    {totalQty}
+                  </TableCell>
+
+                  {/* Valor */}
+                  <TableCell className="text-right text-sm font-medium tabular-nums whitespace-nowrap">
+                    {formatCurrency(totalValue)}
+                  </TableCell>
+
+                  {/* Sem preço */}
+                  <TableCell className="text-center">
+                    {hasZeroPrice && (
+                      <AlertTriangle
+                        className="h-4 w-4 text-amber-500 mx-auto"
+                        aria-label="Contém item sem preço"
+                      />
+                    )}
+                  </TableCell>
+
+                  {/* Ações — stopPropagation so row click doesn't double-fire */}
+                  <TableCell
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setSelectedId(occ.id)}
+                    >
+                      Ver
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+
+        {/* ── Pagination bar ───────────────────────────────────────────── */}
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t text-sm">
+          {/* Count */}
+          <span className="text-muted-foreground">
+            {total === 0
+              ? "Nenhuma ocorrência"
+              : `${rangeStart}–${rangeEnd} de ${total} ocorrência${total !== 1 ? "s" : ""}`}
+          </span>
+
+          <div className="flex items-center gap-4">
+            {/* Page size picker */}
+            <div className="flex items-center gap-1 text-muted-foreground text-xs">
+              <span>Por página:</span>
+              {VALID_PAGE_SIZES.map((size) => (
+                <Link
+                  key={size}
+                  href={buildPageUrl(currentParams, {
+                    pageSize: String(size),
+                    page: "1",
+                  })}
+                  className={`px-2 py-0.5 rounded font-medium transition-colors ${
+                    pageSize === size
+                      ? "bg-primary text-primary-foreground"
+                      : "hover:bg-muted text-foreground"
+                  }`}
+                >
+                  {size}
+                </Link>
+              ))}
+            </div>
+
+            {/* Prev / page indicator / Next */}
+            <div className="flex items-center gap-1">
+              {page > 1 ? (
+                <Link href={buildPageUrl(currentParams, { page: String(page - 1) })}>
+                  <Button variant="outline" size="sm">
+                    <ChevronLeft className="h-4 w-4" />
+                    Anterior
+                  </Button>
+                </Link>
+              ) : (
+                <Button variant="outline" size="sm" disabled>
+                  <ChevronLeft className="h-4 w-4" />
+                  Anterior
+                </Button>
+              )}
+
+              <span className="px-3 text-muted-foreground text-xs whitespace-nowrap">
+                Página {page} de {totalPages}
+              </span>
+
+              {page < totalPages ? (
+                <Link href={buildPageUrl(currentParams, { page: String(page + 1) })}>
+                  <Button variant="outline" size="sm">
+                    Próxima
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </Link>
+              ) : (
+                <Button variant="outline" size="sm" disabled>
+                  Próxima
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}

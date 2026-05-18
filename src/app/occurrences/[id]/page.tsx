@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db/client";
 import { auth } from "@/auth";
 import { notFound, redirect } from "next/navigation";
 import { OccurrenceDetail } from "@/components/occurrences/occurrence-detail";
+import { hasPermission } from "@/lib/permissions";
 
 async function getOccurrence(id: string) {
   return prisma.damageOccurrence.findUnique({
@@ -34,8 +35,13 @@ export default async function OccurrenceDetailPage({ params }: { params: Promise
 
   const { id } = await params;
   const occurrence = await getOccurrence(id);
-  if (!occurrence) notFound();
-  if (occurrence.clientId !== session.user.clientId) notFound();
+
+  // Return 404 for both "not found" and "wrong client" to avoid leaking existence
+  if (!occurrence || occurrence.clientId !== session.user.clientId) notFound();
+
+  const canViewAll = hasPermission(session.user, "occurrence:view_all");
+  // SEPARADOR (view_own only) may only access their own occurrences
+  if (!canViewAll && occurrence.openedByUserId !== session.user.id) notFound();
 
   const parameters = await getParameters(occurrence.clientId);
 
