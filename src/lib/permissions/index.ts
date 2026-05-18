@@ -32,6 +32,9 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "occurrence:edit_status",
     "occurrence:edit_destination",
     "occurrence:complete",
+    "dashboard:indicators",
+    "product:manage",
+    "price:manage",
   ],
   GESTOR: [
     "occurrence:view_all",
