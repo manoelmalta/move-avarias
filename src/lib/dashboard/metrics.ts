@@ -51,10 +51,10 @@ export function computeMetrics(
   const totalItems = allItems.length;
   const totalQuantity = allItems.reduce((s, i) => s + i.quantity, 0);
   const registeredValue = allItems.reduce((s, i) => s + i.totalValue, 0);
-  const zeroValueItems = allItems.filter((i) => i.unitValue === 0).length;
+  const zeroValueItems = allItems.filter((i) => i.unitValue <= 0.01).length;
   const zeroValuePercent = totalItems > 0 ? (zeroValueItems / totalItems) * 100 : 0;
   const uniqueProductsWithoutPrice = new Set(
-    allItems.filter((i) => i.unitValue === 0).map((i) => i.productId)
+    allItems.filter((i) => i.unitValue <= 0.01).map((i) => i.productId)
   ).size;
 
   const stuckThresholdDays = 7;
