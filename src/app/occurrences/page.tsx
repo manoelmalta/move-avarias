@@ -77,7 +77,7 @@ async function getOccurrences(
     });
   }
   if (searchParams.noPrice === "true") {
-    andConditions.push({ items: { some: { unitValue: 0 } } });
+    andConditions.push({ items: { some: { unitValue: { lte: 0.01 } } } });
   }
   if (andConditions.length > 0) where.AND = andConditions;
 

@@ -199,7 +199,7 @@ export function OccurrencesTable({
           occurrences.map((occ) => {
             const totalValue = occ.items.reduce((s, i) => s + i.totalValue, 0);
             const totalQty = occ.items.reduce((s, i) => s + i.quantity, 0);
-            const hasZeroPrice = occ.items.some((i) => i.unitValue === 0);
+            const hasZeroPrice = occ.items.some((i) => i.unitValue <= 0.01);
             const damageTypes = [
               ...new Map(
                 occ.items.map((i) => [i.damageType.id, i.damageType.name])
@@ -319,7 +319,7 @@ export function OccurrencesTable({
             {occurrences.map((occ) => {
               const totalValue = occ.items.reduce((s, i) => s + i.totalValue, 0);
               const totalQty = occ.items.reduce((s, i) => s + i.quantity, 0);
-              const hasZeroPrice = occ.items.some((i) => i.unitValue === 0);
+              const hasZeroPrice = occ.items.some((i) => i.unitValue <= 0.01);
               const damageTypes = [
                 ...new Map(
                   occ.items.map((i) => [i.damageType.id, i.damageType.name])

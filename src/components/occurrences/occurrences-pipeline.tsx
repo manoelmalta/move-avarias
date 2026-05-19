@@ -170,7 +170,7 @@ function OccurrenceCard({
 
   const totalValue = occ.items.reduce((s, i) => s + i.totalValue, 0);
   const totalQty = occ.items.reduce((s, i) => s + i.quantity, 0);
-  const hasZeroPrice = occ.items.some((i) => i.unitValue === 0);
+  const hasZeroPrice = occ.items.some((i) => i.unitValue <= 0.01);
   const damageTypes = [
     ...new Map(
       occ.items.map((i) => [i.damageType.id, i.damageType.name])
@@ -390,7 +390,7 @@ export function OccurrencesPipeline({
     }
     if (onlyOpen) result = result.filter((occ) => occ.completedAt === null);
     if (onlyNoPrice)
-      result = result.filter((occ) => occ.items.some((i) => i.unitValue === 0));
+      result = result.filter((occ) => occ.items.some((i) => i.unitValue <= 0.01));
     if (daysFilter !== "all") {
       result = result.filter((occ) => {
         if (occ.completedAt !== null) return false;
@@ -436,7 +436,7 @@ export function OccurrencesPipeline({
       (s, o) => s + o.items.reduce((is, i) => is + i.totalValue, 0),
       0
     );
-    const noPrice = filtered.filter((o) => o.items.some((i) => i.unitValue === 0))
+    const noPrice = filtered.filter((o) => o.items.some((i) => i.unitValue <= 0.01))
       .length;
     const green = open.filter(
       (o) => getDaysRange(daysOpen(o.createdAt)) === "green"
