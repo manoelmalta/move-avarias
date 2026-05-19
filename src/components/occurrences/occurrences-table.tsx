@@ -86,6 +86,89 @@ function buildPageUrl(
 
 const VALID_PAGE_SIZES = [25, 50, 100] as const;
 
+// ── Pagination bar (shared between mobile and desktop) ───────────────────────
+
+function PaginationBar({
+  pagination,
+  currentParams,
+}: {
+  pagination: OccurrencesTableProps["pagination"];
+  currentParams: Record<string, string>;
+}) {
+  const { total, page, pageSize, totalPages } = pagination;
+  const rangeStart = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const rangeEnd = Math.min(page * pageSize, total);
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t text-sm bg-card">
+      {/* Count */}
+      <span className="text-muted-foreground text-xs">
+        {total === 0
+          ? "Nenhuma ocorrência"
+          : `${rangeStart}–${rangeEnd} de ${total} ocorrência${total !== 1 ? "s" : ""}`}
+      </span>
+
+      <div className="flex items-center gap-3 flex-wrap">
+        {/* Page size picker */}
+        <div className="flex items-center gap-1 text-muted-foreground text-xs">
+          <span>Por página:</span>
+          {VALID_PAGE_SIZES.map((size) => (
+            <Link
+              key={size}
+              href={buildPageUrl(currentParams, {
+                pageSize: String(size),
+                page: "1",
+              })}
+              className={`px-2 py-0.5 rounded font-medium transition-colors ${
+                pageSize === size
+                  ? "bg-primary text-primary-foreground"
+                  : "hover:bg-muted text-foreground"
+              }`}
+            >
+              {size}
+            </Link>
+          ))}
+        </div>
+
+        {/* Prev / page indicator / Next */}
+        <div className="flex items-center gap-1">
+          {page > 1 ? (
+            <Link href={buildPageUrl(currentParams, { page: String(page - 1) })}>
+              <Button variant="outline" size="sm">
+                <ChevronLeft className="h-4 w-4" />
+                Anterior
+              </Button>
+            </Link>
+          ) : (
+            <Button variant="outline" size="sm" disabled>
+              <ChevronLeft className="h-4 w-4" />
+              Anterior
+            </Button>
+          )}
+
+          <span className="px-3 text-muted-foreground text-xs whitespace-nowrap">
+            {page} / {totalPages}
+          </span>
+
+          {page < totalPages ? (
+            <Link href={buildPageUrl(currentParams, { page: String(page + 1) })}>
+              <Button variant="outline" size="sm">
+                Próxima
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </Link>
+          ) : (
+            <Button variant="outline" size="sm" disabled>
+              Próxima
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function OccurrencesTable({
@@ -94,10 +177,6 @@ export function OccurrencesTable({
   currentParams,
 }: OccurrencesTableProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const { total, page, pageSize, totalPages } = pagination;
-
-  const rangeStart = total === 0 ? 0 : (page - 1) * pageSize + 1;
-  const rangeEnd = Math.min(page * pageSize, total);
 
   return (
     <>
@@ -110,8 +189,103 @@ export function OccurrencesTable({
         }}
       />
 
-      {/* ── Table card ───────────────────────────────────────────────── */}
-      <div className="rounded-lg border bg-card overflow-x-auto">
+      {/* ── Mobile card list — hidden on md+ ────────────────────────── */}
+      <div className="md:hidden space-y-2">
+        {occurrences.length === 0 ? (
+          <div className="rounded-lg border bg-card py-10 text-center text-sm text-muted-foreground">
+            Nenhuma ocorrência encontrada.
+          </div>
+        ) : (
+          occurrences.map((occ) => {
+            const totalValue = occ.items.reduce((s, i) => s + i.totalValue, 0);
+            const totalQty = occ.items.reduce((s, i) => s + i.quantity, 0);
+            const hasZeroPrice = occ.items.some((i) => i.unitValue === 0);
+            const damageTypes = [
+              ...new Map(
+                occ.items.map((i) => [i.damageType.id, i.damageType.name])
+              ).entries(),
+            ].map(([id, name]) => ({ id, name }));
+
+            return (
+              <div
+                key={occ.id}
+                className="rounded-lg border bg-card p-4 cursor-pointer active:bg-muted/30 transition-colors"
+                onClick={() => setSelectedId(occ.id)}
+              >
+                {/* Header: code + status + zero-price warning */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 flex-wrap min-w-0">
+                    <span className="font-mono text-sm font-semibold">
+                      {occ.occurrenceCode}
+                    </span>
+                    <Badge
+                      variant={getStatusVariant(occ.status.name)}
+                      className="text-xs"
+                    >
+                      {occ.status.name}
+                    </Badge>
+                    {hasZeroPrice && (
+                      <AlertTriangle
+                        className="h-3.5 w-3.5 text-amber-500"
+                        aria-label="Contém item sem preço"
+                      />
+                    )}
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0 h-9"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedId(occ.id);
+                    }}
+                  >
+                    Ver
+                  </Button>
+                </div>
+
+                {/* Meta row */}
+                <div className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                  <span>{formatDate(occ.createdAt)}</span>
+                  <span>Origem: {occ.origin.name}</span>
+                  {occ.destination && <span>Destino: {occ.destination.name}</span>}
+                  <span>{occ.openedBy.name}</span>
+                </div>
+
+                {/* Footer: damage types + totals */}
+                <div className="mt-3 flex items-end justify-between gap-2">
+                  <div className="flex flex-wrap gap-1 min-w-0">
+                    {damageTypes.length === 0 ? (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    ) : (
+                      damageTypes.map((dt) => (
+                        <Badge key={dt.id} variant="secondary" className="text-xs">
+                          {dt.name}
+                        </Badge>
+                      ))
+                    )}
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-sm font-semibold tabular-nums">
+                      {formatCurrency(totalValue)}
+                    </p>
+                    <p className="text-xs text-muted-foreground tabular-nums">
+                      {totalQty}x
+                    </p>
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+
+        <div className="rounded-lg border overflow-hidden">
+          <PaginationBar pagination={pagination} currentParams={currentParams} />
+        </div>
+      </div>
+
+      {/* ── Desktop table — hidden on mobile ────────────────────────── */}
+      <div className="hidden md:block rounded-lg border bg-card overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -257,73 +431,7 @@ export function OccurrencesTable({
           </TableBody>
         </Table>
 
-        {/* ── Pagination bar ───────────────────────────────────────────── */}
-        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t text-sm">
-          {/* Count */}
-          <span className="text-muted-foreground">
-            {total === 0
-              ? "Nenhuma ocorrência"
-              : `${rangeStart}–${rangeEnd} de ${total} ocorrência${total !== 1 ? "s" : ""}`}
-          </span>
-
-          <div className="flex items-center gap-4">
-            {/* Page size picker */}
-            <div className="flex items-center gap-1 text-muted-foreground text-xs">
-              <span>Por página:</span>
-              {VALID_PAGE_SIZES.map((size) => (
-                <Link
-                  key={size}
-                  href={buildPageUrl(currentParams, {
-                    pageSize: String(size),
-                    page: "1",
-                  })}
-                  className={`px-2 py-0.5 rounded font-medium transition-colors ${
-                    pageSize === size
-                      ? "bg-primary text-primary-foreground"
-                      : "hover:bg-muted text-foreground"
-                  }`}
-                >
-                  {size}
-                </Link>
-              ))}
-            </div>
-
-            {/* Prev / page indicator / Next */}
-            <div className="flex items-center gap-1">
-              {page > 1 ? (
-                <Link href={buildPageUrl(currentParams, { page: String(page - 1) })}>
-                  <Button variant="outline" size="sm">
-                    <ChevronLeft className="h-4 w-4" />
-                    Anterior
-                  </Button>
-                </Link>
-              ) : (
-                <Button variant="outline" size="sm" disabled>
-                  <ChevronLeft className="h-4 w-4" />
-                  Anterior
-                </Button>
-              )}
-
-              <span className="px-3 text-muted-foreground text-xs whitespace-nowrap">
-                Página {page} de {totalPages}
-              </span>
-
-              {page < totalPages ? (
-                <Link href={buildPageUrl(currentParams, { page: String(page + 1) })}>
-                  <Button variant="outline" size="sm">
-                    Próxima
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </Link>
-              ) : (
-                <Button variant="outline" size="sm" disabled>
-                  Próxima
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
+        <PaginationBar pagination={pagination} currentParams={currentParams} />
       </div>
     </>
   );

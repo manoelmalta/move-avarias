@@ -134,7 +134,7 @@ export function DashboardView({
       className="-m-6"
       style={{ background: "#F4F7F1", minHeight: "calc(100% + 3rem)" }}
     >
-      <div className="px-6 py-7 space-y-6 max-w-[1440px] mx-auto">
+      <div className="px-3 md:px-6 py-4 md:py-7 space-y-6 max-w-[1440px] mx-auto">
         {/* Header */}
         <header className="flex items-start justify-between gap-4 flex-wrap">
           <div className="min-w-0">

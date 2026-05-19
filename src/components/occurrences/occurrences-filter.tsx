@@ -55,7 +55,7 @@ export function OccurrencesFilter({
       {/* Código */}
       <Input
         placeholder="Buscar por código..."
-        className="w-44"
+        className="w-full sm:w-44"
         defaultValue={currentParams.code ?? ""}
         onKeyDown={(e) => {
           if (e.key === "Enter")
@@ -69,7 +69,7 @@ export function OccurrencesFilter({
         value={currentParams.statusId ?? "all"}
         onValueChange={(v) => updateFilter("statusId", v)}
       >
-        <SelectTrigger className="w-48">
+        <SelectTrigger className="w-full sm:w-48">
           <SelectValue placeholder="Status" />
         </SelectTrigger>
         <SelectContent>
@@ -87,7 +87,7 @@ export function OccurrencesFilter({
         value={currentParams.lifecycle ?? "all"}
         onValueChange={(v) => updateFilter("lifecycle", v)}
       >
-        <SelectTrigger className="w-44">
+        <SelectTrigger className="w-full sm:w-44">
           <SelectValue placeholder="Ciclo" />
         </SelectTrigger>
         <SelectContent>
@@ -102,7 +102,7 @@ export function OccurrencesFilter({
         value={currentParams.originId ?? "all"}
         onValueChange={(v) => updateFilter("originId", v)}
       >
-        <SelectTrigger className="w-36">
+        <SelectTrigger className="w-full sm:w-36">
           <SelectValue placeholder="Origem" />
         </SelectTrigger>
         <SelectContent>
@@ -120,7 +120,7 @@ export function OccurrencesFilter({
         value={currentParams.damageTypeId ?? "all"}
         onValueChange={(v) => updateFilter("damageTypeId", v)}
       >
-        <SelectTrigger className="w-44">
+        <SelectTrigger className="w-full sm:w-44">
           <SelectValue placeholder="Tipo de Avaria" />
         </SelectTrigger>
         <SelectContent>
@@ -138,7 +138,7 @@ export function OccurrencesFilter({
         value={currentParams.destinationId ?? "all"}
         onValueChange={(v) => updateFilter("destinationId", v)}
       >
-        <SelectTrigger className="w-40">
+        <SelectTrigger className="w-full sm:w-40">
           <SelectValue placeholder="Destinação" />
         </SelectTrigger>
         <SelectContent>
@@ -157,7 +157,7 @@ export function OccurrencesFilter({
           value={currentParams.openedByUserId ?? "all"}
           onValueChange={(v) => updateFilter("openedByUserId", v)}
         >
-          <SelectTrigger className="w-40">
+          <SelectTrigger className="w-full sm:w-40">
             <SelectValue placeholder="Responsável" />
           </SelectTrigger>
           <SelectContent>
@@ -172,12 +172,12 @@ export function OccurrencesFilter({
       )}
 
       {/* ── Row 2: date ranges ───────────────────────────────────────── */}
-      <div className="flex items-center gap-1.5 flex-wrap">
+      <div className="w-full sm:w-auto flex items-center gap-1.5 flex-wrap">
         <span className="text-xs text-muted-foreground whitespace-nowrap">Abertura:</span>
         <Input
           key={`dateFrom-${currentParams.dateFrom ?? ""}`}
           type="date"
-          className="w-36"
+          className="flex-1 sm:flex-none sm:w-36"
           defaultValue={currentParams.dateFrom ?? ""}
           onBlur={(e) => updateFilter("dateFrom", e.target.value)}
         />
@@ -185,18 +185,18 @@ export function OccurrencesFilter({
         <Input
           key={`dateTo-${currentParams.dateTo ?? ""}`}
           type="date"
-          className="w-36"
+          className="flex-1 sm:flex-none sm:w-36"
           defaultValue={currentParams.dateTo ?? ""}
           onBlur={(e) => updateFilter("dateTo", e.target.value)}
         />
       </div>
 
-      <div className="flex items-center gap-1.5 flex-wrap">
+      <div className="w-full sm:w-auto flex items-center gap-1.5 flex-wrap">
         <span className="text-xs text-muted-foreground whitespace-nowrap">Encerramento:</span>
         <Input
           key={`completedFrom-${currentParams.completedFrom ?? ""}`}
           type="date"
-          className="w-36"
+          className="flex-1 sm:flex-none sm:w-36"
           defaultValue={currentParams.completedFrom ?? ""}
           onBlur={(e) => updateFilter("completedFrom", e.target.value)}
         />
@@ -204,7 +204,7 @@ export function OccurrencesFilter({
         <Input
           key={`completedTo-${currentParams.completedTo ?? ""}`}
           type="date"
-          className="w-36"
+          className="flex-1 sm:flex-none sm:w-36"
           defaultValue={currentParams.completedTo ?? ""}
           onBlur={(e) => updateFilter("completedTo", e.target.value)}
         />
@@ -217,7 +217,7 @@ export function OccurrencesFilter({
         onClick={() =>
           updateFilter("noPrice", currentParams.noPrice === "true" ? "" : "true")
         }
-        className="gap-1.5"
+        className="gap-1.5 w-full sm:w-auto"
       >
         <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
         Sem preço
@@ -225,7 +225,12 @@ export function OccurrencesFilter({
 
       {/* ── Clear all ────────────────────────────────────────────────── */}
       {hasFilters && (
-        <Button variant="ghost" size="sm" onClick={clearAll} className="gap-1">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={clearAll}
+          className="gap-1 w-full sm:w-auto"
+        >
           <X className="h-4 w-4" />
           Limpar filtros
         </Button>

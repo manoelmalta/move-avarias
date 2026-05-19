@@ -89,7 +89,7 @@ export function ExpandableChartCard({
           <button
             type="button"
             onClick={() => setOpen(true)}
-            className="flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded transition-colors"
+            className="flex items-center gap-1 text-[11px] font-medium px-2 py-1 min-h-[36px] rounded transition-colors"
             style={{
               color: "#0D6F65",
               background: "transparent",
