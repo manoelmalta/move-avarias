@@ -50,7 +50,7 @@ export function NewOccurrenceForm({ origins, damageTypes }: { origins: Origin[];
   const [error, setError] = useState("");
 
   const [barcode, setBarcode] = useState("");
-  const [quantity, setQuantity] = useState(1);
+  const [quantity, setQuantity] = useState("1");
   const [batch, setBatch] = useState("");
   const [expirationDate, setExpirationDate] = useState("");
   const [damageTypeId, setDamageTypeId] = useState("");
@@ -166,21 +166,26 @@ export function NewOccurrenceForm({ origins, damageTypes }: { origins: Origin[];
 
   const addItem = () => {
     if (!foundProduct || !damageTypeId) return;
+    const parsedQuantity = Number(quantity);
+    if (!Number.isFinite(parsedQuantity) || parsedQuantity <= 0) {
+      setProductError("Informe uma quantidade válida.");
+      return;
+    }
     const unitValue = foundProduct.unitValue ?? 0;
-    const totalValue = unitValue * quantity;
+    const totalValue = unitValue * parsedQuantity;
     setItems((prev) => [...prev, {
       productId: foundProduct.id,
       internalCode: foundProduct.internalCode,
       description: foundProduct.description,
       barcodeInput: barcode,
-      quantity,
+      quantity: parsedQuantity,
       unitValue,
       totalValue,
       batch,
       expirationDate,
       damageTypeId,
     }]);
-    setBarcode(""); setQuantity(1); setBatch(""); setExpirationDate(""); setDamageTypeId(""); setFoundProduct(null);
+    setBarcode(""); setQuantity("1"); setBatch(""); setExpirationDate(""); setDamageTypeId(""); setFoundProduct(null);
     setSuggestions([]); setShowDropdown(false);
   };
 
@@ -356,7 +361,7 @@ export function NewOccurrenceForm({ origins, damageTypes }: { origins: Origin[];
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-xs">Quantidade *</Label>
-                  <Input type="number" min={0.001} step={0.001} value={quantity} onChange={(e) => setQuantity(parseFloat(e.target.value) || 1)} />
+                  <Input type="number" min="0.001" step="0.001" inputMode="decimal" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">Valor Unit.</Label>
@@ -381,7 +386,7 @@ export function NewOccurrenceForm({ origins, damageTypes }: { origins: Origin[];
                 </Select>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm">Total: <strong>{formatCurrency((foundProduct.unitValue ?? 0) * quantity)}</strong></span>
+                <span className="text-sm">Total: <strong>{formatCurrency((foundProduct.unitValue ?? 0) * (Number(quantity) || 0))}</strong></span>
                 <Button type="button" onClick={addItem} disabled={!damageTypeId}>
                   <Plus className="h-4 w-4" />Adicionar
                 </Button>
