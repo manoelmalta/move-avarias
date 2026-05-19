@@ -54,6 +54,7 @@ export function NewOccurrenceForm({ origins, damageTypes }: { origins: Origin[];
   const [batch, setBatch] = useState("");
   const [expirationDate, setExpirationDate] = useState("");
   const [damageTypeId, setDamageTypeId] = useState("");
+  const [unitValueInput, setUnitValueInput] = useState("");
   const [searching, setSearching] = useState(false);
   const [foundProduct, setFoundProduct] = useState<ProductFound | null>(null);
   const [productError, setProductError] = useState("");
@@ -100,6 +101,7 @@ export function NewOccurrenceForm({ origins, damageTypes }: { origins: Origin[];
   const handleBarcodeChange = (value: string) => {
     setBarcode(value);
     setFoundProduct(null);
+    setUnitValueInput("");
     setProductError("");
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -114,6 +116,7 @@ export function NewOccurrenceForm({ origins, damageTypes }: { origins: Origin[];
 
   const selectSuggestion = (p: ProductFound) => {
     setFoundProduct(p);
+    setUnitValueInput(String(p.unitValue ?? 0.01));
     setBarcode(p.internalCode);
     setSuggestions([]);
     setShowDropdown(false);
@@ -133,6 +136,7 @@ export function NewOccurrenceForm({ origins, damageTypes }: { origins: Origin[];
       if (!res.ok) { setProductError("Produto não encontrado"); return; }
       const p = await res.json() as ProductFound;
       setFoundProduct(p);
+      setUnitValueInput(String(p.unitValue ?? 0.01));
     } catch { setProductError("Erro ao buscar produto"); }
     finally { setSearching(false); }
   };
@@ -155,6 +159,7 @@ export function NewOccurrenceForm({ origins, damageTypes }: { origins: Origin[];
         if (!res.ok) { setProductError("Produto não encontrado para o código lido."); return; }
         const p = await res.json() as ProductFound;
         setFoundProduct(p);
+        setUnitValueInput(String(p.unitValue ?? 0.01));
       } catch {
         setProductError("Erro ao buscar produto. Tente novamente.");
       } finally {
@@ -171,21 +176,26 @@ export function NewOccurrenceForm({ origins, damageTypes }: { origins: Origin[];
       setProductError("Informe uma quantidade válida.");
       return;
     }
-    const unitValue = foundProduct.unitValue ?? 0;
-    const totalValue = unitValue * parsedQuantity;
+    const parsedUnitValue = parseFloat(unitValueInput);
+    if (!Number.isFinite(parsedUnitValue) || parsedUnitValue < 0.01) {
+      setProductError("Informe um valor unitário válido (mínimo R$ 0,01).");
+      return;
+    }
+    const totalValue = parsedUnitValue * parsedQuantity;
     setItems((prev) => [...prev, {
       productId: foundProduct.id,
       internalCode: foundProduct.internalCode,
       description: foundProduct.description,
       barcodeInput: barcode,
       quantity: parsedQuantity,
-      unitValue,
+      unitValue: parsedUnitValue,
       totalValue,
       batch,
       expirationDate,
       damageTypeId,
     }]);
-    setBarcode(""); setQuantity("1"); setBatch(""); setExpirationDate(""); setDamageTypeId(""); setFoundProduct(null);
+    setBarcode(""); setQuantity("1"); setBatch(""); setExpirationDate(""); setDamageTypeId("");
+    setFoundProduct(null); setUnitValueInput("");
     setSuggestions([]); setShowDropdown(false);
   };
 
@@ -361,8 +371,8 @@ export function NewOccurrenceForm({ origins, damageTypes }: { origins: Origin[];
               <div className="flex items-center gap-2">
                 <Badge variant="info">{foundProduct.internalCode}</Badge>
                 <span className="font-medium">{foundProduct.description}</span>
-                <span className="text-muted-foreground text-sm ml-auto">
-                  {foundProduct.unitValue != null ? formatCurrency(foundProduct.unitValue) : "Sem preço"}
+                <span className="text-xs text-muted-foreground ml-auto">
+                  Custo cadastrado: {foundProduct.unitValue != null ? formatCurrency(foundProduct.unitValue) : "—"}
                 </span>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -371,8 +381,16 @@ export function NewOccurrenceForm({ origins, damageTypes }: { origins: Origin[];
                   <Input type="number" min="0.001" step="0.001" inputMode="decimal" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Valor Unit.</Label>
-                  <Input value={foundProduct.unitValue != null ? formatCurrency(foundProduct.unitValue) : ""} readOnly className="bg-muted" />
+                  <Label className="text-xs">Valor unit. na ocorrência *</Label>
+                  <Input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    inputMode="decimal"
+                    value={unitValueInput}
+                    onChange={(e) => setUnitValueInput(e.target.value)}
+                    placeholder="0,00"
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">Lote</Label>
@@ -393,7 +411,7 @@ export function NewOccurrenceForm({ origins, damageTypes }: { origins: Origin[];
                 </Select>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm">Total: <strong>{formatCurrency((foundProduct.unitValue ?? 0) * (Number(quantity) || 0))}</strong></span>
+                <span className="text-sm">Total: <strong>{formatCurrency((parseFloat(unitValueInput) || 0) * (Number(quantity) || 0))}</strong></span>
                 <Button type="button" onClick={addItem} disabled={!damageTypeId}>
                   <Plus className="h-4 w-4" />Adicionar
                 </Button>
