@@ -11,7 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency } from "@/lib/utils";
-import { Plus, Trash2, Search, Loader2 } from "lucide-react";
+import { Plus, Trash2, Search, Loader2, ScanBarcode } from "lucide-react";
+import { BarcodeScannerDialog } from "@/components/barcode/barcode-scanner-dialog";
 
 interface Origin { id: string; name: string }
 interface DamageType { id: string; name: string }
@@ -56,6 +57,7 @@ export function NewOccurrenceForm({ origins, damageTypes }: { origins: Origin[];
   const [searching, setSearching] = useState(false);
   const [foundProduct, setFoundProduct] = useState<ProductFound | null>(null);
   const [productError, setProductError] = useState("");
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   // Autocomplete state
   const [suggestions, setSuggestions] = useState<ProductFound[]>([]);
@@ -133,6 +135,33 @@ export function NewOccurrenceForm({ origins, damageTypes }: { origins: Origin[];
       setFoundProduct(p);
     } catch { setProductError("Erro ao buscar produto"); }
     finally { setSearching(false); }
+  };
+
+  // ── Camera barcode handler ─────────────────────────────────────────────────
+
+  const handleScanned = (code: string) => {
+    setBarcode(code);
+    setFoundProduct(null);
+    setProductError("");
+    setSuggestions([]);
+    setShowDropdown(false);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    // Exact lookup via barcode — pass code directly, not through state
+    async function lookup() {
+      setSearching(true);
+      try {
+        const res = await fetch(`/api/search/product?barcode=${encodeURIComponent(code)}`);
+        if (!res.ok) { setProductError("Produto não encontrado para o código lido."); return; }
+        const p = await res.json() as ProductFound;
+        setFoundProduct(p);
+      } catch {
+        setProductError("Erro ao buscar produto. Tente novamente.");
+      } finally {
+        setSearching(false);
+      }
+    }
+    void lookup();
   };
 
   const addItem = () => {
@@ -254,6 +283,17 @@ export function NewOccurrenceForm({ origins, damageTypes }: { origins: Origin[];
               <Button type="button" variant="outline" onClick={searchProduct} disabled={searching}>
                 {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
               </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setScannerOpen(true)}
+                disabled={searching}
+                className="h-10 w-10 shrink-0 p-0"
+                aria-label="Ler código de barras pela câmera"
+                title="Ler código de barras pela câmera"
+              >
+                <ScanBarcode className="h-4 w-4" />
+              </Button>
             </div>
 
             {/* Autocomplete dropdown */}
@@ -296,7 +336,7 @@ export function NewOccurrenceForm({ origins, damageTypes }: { origins: Origin[];
 
             {/* Loading indicator while fetching suggestions (no dropdown yet) */}
             {loadingSuggestions && !showDropdown && (
-              <div className="absolute right-12 top-1/2 -translate-y-1/2">
+              <div className="absolute right-24 top-1/2 -translate-y-1/2">
                 <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
               </div>
             )}
@@ -403,6 +443,12 @@ export function NewOccurrenceForm({ origins, damageTypes }: { origins: Origin[];
           Salvar Ocorrência
         </Button>
       </div>
+
+      <BarcodeScannerDialog
+        open={scannerOpen}
+        onOpenChange={setScannerOpen}
+        onDetected={handleScanned}
+      />
     </div>
   );
 }
