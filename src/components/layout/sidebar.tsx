@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   ClipboardList,
+  Kanban,
   PackagePlus,
   Package,
   ScanSearch,
@@ -36,6 +37,9 @@ export function Sidebar({ onMobileClose }: SidebarProps = {}) {
           : []),
         ...(hasPermission(user, "occurrence:view_all") || hasPermission(user, "occurrence:view_own")
           ? [{ href: "/occurrences", label: "Ocorrências", icon: ClipboardList }]
+          : []),
+        ...(hasPermission(user, "occurrence:view_all") || hasPermission(user, "occurrence:view_own")
+          ? [{ href: "/occurrences/pipeline", label: "Pipeline", icon: Kanban }]
           : []),
         ...(hasPermission(user, "occurrence:create")
           ? [{ href: "/occurrences/new", label: "Nova Ocorrência", icon: PackagePlus }]
@@ -115,6 +119,7 @@ export function Sidebar({ onMobileClose }: SidebarProps = {}) {
             const exactMatchOnly = new Set([
               "/dashboard",
               "/occurrences/new",
+              "/occurrences/pipeline",
               "/products",
               "/products/lookup",
             ]);
