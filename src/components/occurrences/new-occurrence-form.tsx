@@ -283,9 +283,16 @@ export function NewOccurrenceForm({ origins, damageTypes }: { origins: Origin[];
                   if (e.key === "Enter") { e.preventDefault(); searchProduct(); }
                   if (e.key === "Escape") { setShowDropdown(false); setSuggestions([]); }
                 }}
-                className="flex-1"
+                className="flex-1 h-12 text-base"
               />
-              <Button type="button" variant="outline" onClick={searchProduct} disabled={searching}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={searchProduct}
+                disabled={searching}
+                className="h-12 w-12 shrink-0 p-0"
+                aria-label="Buscar produto"
+              >
                 {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
               </Button>
               <Button
@@ -293,11 +300,11 @@ export function NewOccurrenceForm({ origins, damageTypes }: { origins: Origin[];
                 variant="outline"
                 onClick={() => setScannerOpen(true)}
                 disabled={searching}
-                className="h-10 w-10 shrink-0 p-0"
+                className="h-12 w-12 shrink-0 p-0"
                 aria-label="Ler código de barras pela câmera"
                 title="Ler código de barras pela câmera"
               >
-                <ScanBarcode className="h-4 w-4" />
+                <ScanBarcode className="h-5 w-5" />
               </Button>
             </div>
 
@@ -404,37 +411,74 @@ export function NewOccurrenceForm({ origins, damageTypes }: { origins: Origin[];
               <span className="text-lg font-bold">Total: {formatCurrency(totalOccurrenceValue)}</span>
             </div>
           </CardHeader>
-          <CardContent className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Código</TableHead>
-                  <TableHead>Descrição</TableHead>
-                  <TableHead>Tipo Avaria</TableHead>
-                  <TableHead>Qtd</TableHead>
-                  <TableHead>Valor Unit.</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {items.map((item, idx) => (
-                  <TableRow key={idx}>
-                    <TableCell className="font-mono text-sm">{item.internalCode}</TableCell>
-                    <TableCell className="text-sm">{item.description}</TableCell>
-                    <TableCell className="text-sm">{damageTypes.find((d) => d.id === item.damageTypeId)?.name}</TableCell>
-                    <TableCell className="text-sm">{item.quantity}</TableCell>
-                    <TableCell className="text-sm">{formatCurrency(item.unitValue)}</TableCell>
-                    <TableCell className="text-right text-sm font-medium">{formatCurrency(item.totalValue)}</TableCell>
-                    <TableCell>
-                      <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(idx)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </TableCell>
+          <CardContent>
+            {/* Mobile card list */}
+            <div className="md:hidden space-y-2">
+              {items.map((item, idx) => (
+                <div key={idx} className="rounded-md border p-3 space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge variant="outline" className="font-mono text-xs shrink-0">
+                          {item.internalCode}
+                        </Badge>
+                        <span className="text-sm font-medium truncate">{item.description}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {damageTypes.find((d) => d.id === item.damageTypeId)?.name}
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0 h-9 w-9"
+                      onClick={() => removeItem(idx)}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                  <div className="flex items-center justify-between text-sm tabular-nums">
+                    <span className="text-muted-foreground">{item.quantity}x {formatCurrency(item.unitValue)}</span>
+                    <span className="font-semibold">{formatCurrency(item.totalValue)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop table */}
+            <div className="hidden md:block overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Código</TableHead>
+                    <TableHead>Descrição</TableHead>
+                    <TableHead>Tipo Avaria</TableHead>
+                    <TableHead>Qtd</TableHead>
+                    <TableHead>Valor Unit.</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead></TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {items.map((item, idx) => (
+                    <TableRow key={idx}>
+                      <TableCell className="font-mono text-sm">{item.internalCode}</TableCell>
+                      <TableCell className="text-sm">{item.description}</TableCell>
+                      <TableCell className="text-sm">{damageTypes.find((d) => d.id === item.damageTypeId)?.name}</TableCell>
+                      <TableCell className="text-sm">{item.quantity}</TableCell>
+                      <TableCell className="text-sm">{formatCurrency(item.unitValue)}</TableCell>
+                      <TableCell className="text-right text-sm font-medium">{formatCurrency(item.totalValue)}</TableCell>
+                      <TableCell>
+                        <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(idx)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </CardContent>
         </Card>
       )}
