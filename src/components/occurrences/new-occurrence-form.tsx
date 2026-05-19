@@ -11,7 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency } from "@/lib/utils";
-import { Plus, Trash2, Search, Loader2 } from "lucide-react";
+import { Plus, Trash2, Search, Loader2, ScanBarcode } from "lucide-react";
+import { BarcodeScannerDialog } from "@/components/barcode/barcode-scanner-dialog";
 
 interface Origin { id: string; name: string }
 interface DamageType { id: string; name: string }
@@ -49,13 +50,14 @@ export function NewOccurrenceForm({ origins, damageTypes }: { origins: Origin[];
   const [error, setError] = useState("");
 
   const [barcode, setBarcode] = useState("");
-  const [quantity, setQuantity] = useState(1);
+  const [quantity, setQuantity] = useState("1");
   const [batch, setBatch] = useState("");
   const [expirationDate, setExpirationDate] = useState("");
   const [damageTypeId, setDamageTypeId] = useState("");
   const [searching, setSearching] = useState(false);
   const [foundProduct, setFoundProduct] = useState<ProductFound | null>(null);
   const [productError, setProductError] = useState("");
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   // Autocomplete state
   const [suggestions, setSuggestions] = useState<ProductFound[]>([]);
@@ -135,23 +137,55 @@ export function NewOccurrenceForm({ origins, damageTypes }: { origins: Origin[];
     finally { setSearching(false); }
   };
 
+  // ── Camera barcode handler ─────────────────────────────────────────────────
+
+  const handleScanned = (code: string) => {
+    setBarcode(code);
+    setFoundProduct(null);
+    setProductError("");
+    setSuggestions([]);
+    setShowDropdown(false);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    // Exact lookup via barcode — pass code directly, not through state
+    async function lookup() {
+      setSearching(true);
+      try {
+        const res = await fetch(`/api/search/product?barcode=${encodeURIComponent(code)}`);
+        if (!res.ok) { setProductError("Produto não encontrado para o código lido."); return; }
+        const p = await res.json() as ProductFound;
+        setFoundProduct(p);
+      } catch {
+        setProductError("Erro ao buscar produto. Tente novamente.");
+      } finally {
+        setSearching(false);
+      }
+    }
+    void lookup();
+  };
+
   const addItem = () => {
     if (!foundProduct || !damageTypeId) return;
+    const parsedQuantity = Number(quantity);
+    if (!Number.isFinite(parsedQuantity) || parsedQuantity <= 0) {
+      setProductError("Informe uma quantidade válida.");
+      return;
+    }
     const unitValue = foundProduct.unitValue ?? 0;
-    const totalValue = unitValue * quantity;
+    const totalValue = unitValue * parsedQuantity;
     setItems((prev) => [...prev, {
       productId: foundProduct.id,
       internalCode: foundProduct.internalCode,
       description: foundProduct.description,
       barcodeInput: barcode,
-      quantity,
+      quantity: parsedQuantity,
       unitValue,
       totalValue,
       batch,
       expirationDate,
       damageTypeId,
     }]);
-    setBarcode(""); setQuantity(1); setBatch(""); setExpirationDate(""); setDamageTypeId(""); setFoundProduct(null);
+    setBarcode(""); setQuantity("1"); setBatch(""); setExpirationDate(""); setDamageTypeId(""); setFoundProduct(null);
     setSuggestions([]); setShowDropdown(false);
   };
 
@@ -254,6 +288,17 @@ export function NewOccurrenceForm({ origins, damageTypes }: { origins: Origin[];
               <Button type="button" variant="outline" onClick={searchProduct} disabled={searching}>
                 {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
               </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setScannerOpen(true)}
+                disabled={searching}
+                className="h-10 w-10 shrink-0 p-0"
+                aria-label="Ler código de barras pela câmera"
+                title="Ler código de barras pela câmera"
+              >
+                <ScanBarcode className="h-4 w-4" />
+              </Button>
             </div>
 
             {/* Autocomplete dropdown */}
@@ -296,7 +341,7 @@ export function NewOccurrenceForm({ origins, damageTypes }: { origins: Origin[];
 
             {/* Loading indicator while fetching suggestions (no dropdown yet) */}
             {loadingSuggestions && !showDropdown && (
-              <div className="absolute right-12 top-1/2 -translate-y-1/2">
+              <div className="absolute right-24 top-1/2 -translate-y-1/2">
                 <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
               </div>
             )}
@@ -316,7 +361,7 @@ export function NewOccurrenceForm({ origins, damageTypes }: { origins: Origin[];
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-xs">Quantidade *</Label>
-                  <Input type="number" min={0.001} step={0.001} value={quantity} onChange={(e) => setQuantity(parseFloat(e.target.value) || 1)} />
+                  <Input type="number" min="0.001" step="0.001" inputMode="decimal" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">Valor Unit.</Label>
@@ -341,7 +386,7 @@ export function NewOccurrenceForm({ origins, damageTypes }: { origins: Origin[];
                 </Select>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm">Total: <strong>{formatCurrency((foundProduct.unitValue ?? 0) * quantity)}</strong></span>
+                <span className="text-sm">Total: <strong>{formatCurrency((foundProduct.unitValue ?? 0) * (Number(quantity) || 0))}</strong></span>
                 <Button type="button" onClick={addItem} disabled={!damageTypeId}>
                   <Plus className="h-4 w-4" />Adicionar
                 </Button>
@@ -403,6 +448,12 @@ export function NewOccurrenceForm({ origins, damageTypes }: { origins: Origin[];
           Salvar Ocorrência
         </Button>
       </div>
+
+      <BarcodeScannerDialog
+        open={scannerOpen}
+        onOpenChange={setScannerOpen}
+        onDetected={handleScanned}
+      />
     </div>
   );
 }
