@@ -5,6 +5,7 @@ import { auth } from "@/auth";
 import { hasPermission } from "@/lib/permissions";
 import { UpdateUserSchema } from "@/lib/validations/user";
 import { createAuditLog, auditFieldChanges } from "@/lib/audit";
+import { isProtectedAdmin } from "@/lib/protected-users";
 
 const USER_SELECT = {
   id: true,
@@ -45,6 +46,23 @@ export async function PATCH(
   }
 
   const { name, email, role, active, newPassword } = parsed.data;
+
+  // Proteção ADMIN PROTEGIDO: bloqueia alteração de role, status ou exclusão
+  if (isProtectedAdmin(target.email)) {
+    const triesChangeRole   = role !== undefined && role !== "ADMIN";
+    const triesDeactivate   = active === false;
+    const triesChangeEmail  = email !== undefined && email.trim().toLowerCase() !== target.email.toLowerCase();
+
+    if (triesChangeRole || triesDeactivate || triesChangeEmail) {
+      return NextResponse.json(
+        {
+          error:
+            "Este administrador é protegido e não pode ter perfil, status ou e-mail alterado.",
+        },
+        { status: 403 }
+      );
+    }
+  }
 
   // Proteção A: admin não pode inativar a si mesmo
   if (target.id === session.user.id && active === false) {

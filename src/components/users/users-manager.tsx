@@ -10,8 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatDateTime } from "@/lib/utils";
-import { Plus, Pencil, KeyRound, Loader2, UserCheck, UserX } from "lucide-react";
+import { Plus, Pencil, KeyRound, Loader2, UserCheck, UserX, ShieldCheck } from "lucide-react";
 import type { UserRole } from "@/lib/auth/types";
+import { isProtectedAdmin } from "@/lib/protected-users";
 
 interface User {
   id: string;
@@ -47,6 +48,7 @@ function friendlyError(status: number, msg: string): string {
   if (msg.includes("inativar sua própria")) return "Não é possível inativar o próprio usuário administrador.";
   if (msg.includes("pelo menos um ADMIN")) return "Não é possível remover o último administrador ativo.";
   if (msg.includes("Email já cadastrado")) return "Já existe um usuário com este e-mail.";
+  if (msg.includes("administrador é protegido")) return msg;
   if (status === 403) return "Ação não permitida para este usuário.";
   if (status === 409) return msg;
   return msg || "Erro inesperado. Tente novamente.";
@@ -216,38 +218,81 @@ export function UsersManager({ users: initial, currentUserId }: { users: User[];
               </TableRow>
             </TableHeader>
             <TableBody>
-              {initial.map((u) => (
-                <TableRow key={u.id} className={!u.active ? "opacity-60" : undefined}>
-                  <TableCell className="font-medium text-sm">
-                    {u.name}
-                    {u.id === currentUserId && <span className="ml-1.5 text-xs text-muted-foreground">(você)</span>}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{u.email}</TableCell>
-                  <TableCell>
-                    <Badge variant={roleVariants[u.role as UserRole] ?? "secondary"}>
-                      {roleLabels[u.role as UserRole] ?? u.role}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={u.active ? "success" : "secondary"}>{u.active ? "Ativo" : "Inativo"}</Badge>
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">{formatDateTime(u.createdAt)}</TableCell>
-                  <TableCell className="text-xs text-muted-foreground">{formatDateTime(u.updatedAt)}</TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      <Button size="sm" variant="ghost" className="h-10 w-10 p-0" onClick={() => openEdit(u)} title="Editar">
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button size="sm" variant="ghost" className="h-10 w-10 p-0" onClick={() => handleToggleActive(u)} title={u.active ? "Inativar" : "Ativar"}>
-                        {u.active ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
-                      </Button>
-                      <Button size="sm" variant="ghost" className="h-10 w-10 p-0" onClick={() => openReset(u)} title="Redefinir senha">
-                        <KeyRound className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {initial.map((u) => {
+                const isProtected = isProtectedAdmin(u.email);
+                return (
+                  <TableRow key={u.id} className={!u.active ? "opacity-60" : undefined}>
+                    <TableCell className="font-medium text-sm">
+                      <span className="flex flex-wrap items-center gap-1.5">
+                        {u.name}
+                        {u.id === currentUserId && (
+                          <span className="text-xs text-muted-foreground">(você)</span>
+                        )}
+                        {isProtected && (
+                          <Badge
+                            variant="outline"
+                            className="text-xs gap-1 border-amber-400 text-amber-700 bg-amber-50"
+                            title="Administrador protegido do sistema."
+                          >
+                            <ShieldCheck className="h-3 w-3" />
+                            Admin protegido
+                          </Badge>
+                        )}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{u.email}</TableCell>
+                    <TableCell>
+                      <Badge variant={roleVariants[u.role as UserRole] ?? "secondary"}>
+                        {roleLabels[u.role as UserRole] ?? u.role}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={u.active ? "success" : "secondary"}>{u.active ? "Ativo" : "Inativo"}</Badge>
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{formatDateTime(u.createdAt)}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{formatDateTime(u.updatedAt)}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-10 w-10 p-0"
+                          onClick={() => openEdit(u)}
+                          disabled={isProtected}
+                          title={isProtected ? "Administrador protegido do sistema." : "Editar"}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-10 w-10 p-0"
+                          onClick={() => handleToggleActive(u)}
+                          disabled={isProtected}
+                          title={
+                            isProtected
+                              ? "Administrador protegido do sistema."
+                              : u.active
+                                ? "Inativar"
+                                : "Ativar"
+                          }
+                        >
+                          {u.active ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-10 w-10 p-0"
+                          onClick={() => openReset(u)}
+                          title="Redefinir senha"
+                        >
+                          <KeyRound className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </CardContent>
