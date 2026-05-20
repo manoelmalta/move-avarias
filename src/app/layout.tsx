@@ -9,8 +9,8 @@ import { AuthUserMenu } from "@/components/layout/auth-user-menu";
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist-sans" });
 
 export const metadata: Metadata = {
-  title: "MOVE AVARIAS",
-  description: "Sistema de Controle de Ocorrências de Avarias",
+  title: "MOVE REUSE | Controle de Avarias",
+  description: "Sistema de controle, tratativa e acompanhamento de avarias.",
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
