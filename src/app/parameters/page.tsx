@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { hasPermission } from "@/lib/permissions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { OriginsManager } from "@/components/parameters/origins-manager";
 
 async function getParameters(clientId: string) {
   const [origins, damageTypes, statuses, destinations] = await Promise.all([
@@ -28,13 +29,8 @@ export default async function ParametersPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
           <CardHeader><CardTitle className="text-base">Origens de Avaria</CardTitle></CardHeader>
-          <CardContent className="space-y-2">
-            {data.origins.map((o) => (
-              <div key={o.id} className="flex items-center justify-between text-sm py-1 border-b last:border-0">
-                <span>{o.name}</span>
-                <Badge variant={o.active ? "success" : "secondary"}>{o.active ? "Ativo" : "Inativo"}</Badge>
-              </div>
-            ))}
+          <CardContent>
+            <OriginsManager origins={data.origins} />
           </CardContent>
         </Card>
 
