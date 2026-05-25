@@ -13,7 +13,7 @@ export const UpdateProductSchema = CreateProductSchema.partial().extend({
 
 export const CreatePriceSchema = z.object({
   productId: z.string().min(1, "Produto obrigatório"),
-  unitValue: z.number().positive("Valor deve ser maior que zero"),
+  unitValue: z.number().min(0, "Valor deve ser maior ou igual a zero"),
   validFrom: z.string().min(1, "Data de início obrigatória"),
   validTo: z.string().optional(),
   sourceNote: z.string().optional(),
