@@ -76,6 +76,8 @@ model ProductPrice {
 
   client  Client  @relation(fields: [clientId], references: [id])
   product Product @relation(fields: [productId], references: [id])
+
+  @@unique([clientId, productId, validFrom])
 }
 
 model DamageOccurrence {
