@@ -6,6 +6,7 @@ interface ItemsTableProps {
   rows: ProductGroupRow[];
   totalQuantity: number;
   totalValue: number;
+  totalFinalizedValue: number;
   /** Distinct occurrence count across all product rows in the current filter. */
   totalDistinctOccurrences: number;
 }
@@ -33,6 +34,7 @@ export function ItemsTable({
   rows,
   totalQuantity,
   totalValue,
+  totalFinalizedValue,
   totalDistinctOccurrences,
 }: ItemsTableProps) {
   if (rows.length === 0) {
@@ -71,6 +73,7 @@ export function ItemsTable({
               <th style={{ ...headStyle, textAlign: "left" }}>Descrição</th>
               <th style={{ ...headStyle, textAlign: "right" }}>Quantidade</th>
               <th style={{ ...headStyle, textAlign: "right" }}>Valor Total</th>
+              <th style={{ ...headStyle, textAlign: "right" }}>Valor Finalizado</th>
               <th style={{ ...headStyle, textAlign: "right", paddingRight: 20 }}>Processos</th>
             </tr>
           </thead>
@@ -98,11 +101,11 @@ export function ItemsTable({
                 >
                   {row.internalCode}
                 </td>
-                <td style={{ ...cellStyle, maxWidth: 360 }}>
+                <td style={{ ...cellStyle, maxWidth: 320 }}>
                   <span
                     className="block truncate"
                     title={row.description}
-                    style={{ maxWidth: 360 }}
+                    style={{ maxWidth: 320 }}
                   >
                     {row.description}
                   </span>
@@ -124,6 +127,16 @@ export function ItemsTable({
                   }}
                 >
                   {fmtCurrency(row.totalValue)}
+                </td>
+                <td
+                  style={{
+                    ...cellStyle,
+                    textAlign: "right",
+                    fontVariantNumeric: "tabular-nums",
+                    color: row.finalizedValue > 0 ? "#1C2A24" : "#9AA59F",
+                  }}
+                >
+                  {row.finalizedValue > 0 ? fmtCurrency(row.finalizedValue) : "—"}
                 </td>
                 <td
                   style={{
@@ -187,12 +200,24 @@ export function ItemsTable({
                 style={{
                   ...cellStyle,
                   textAlign: "right",
+                  fontWeight: 700,
+                  color: "#044C45",
+                  fontVariantNumeric: "tabular-nums",
+                  borderTop: "2px solid #DDE7DE",
+                  borderBottom: "none",
+                }}
+              >
+                {totalFinalizedValue > 0 ? fmtCurrency(totalFinalizedValue) : "—"}
+              </td>
+              <td
+                style={{
+                  ...cellStyle,
+                  textAlign: "right",
                   paddingRight: 20,
                   borderTop: "2px solid #DDE7DE",
                   borderBottom: "none",
                 }}
               >
-                {/* Total distinct occurrences = distinct occurrences that have at least one item in this filter */}
                 <span
                   className="inline-flex items-center justify-center rounded px-2 py-0.5 text-xs font-semibold"
                   style={{ background: "#EAF1EC", color: "#0D6F65", minWidth: 28 }}

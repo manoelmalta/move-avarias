@@ -51,6 +51,7 @@ async function getClosingReportData(clientId: string) {
     occurrenceCode: o.occurrenceCode,
     createdAtIso: o.createdAt.toISOString(),
     completedAtIso: o.completedAt?.toISOString() ?? null,
+    updatedAtIso: o.updatedAt.toISOString(),
     statusId: o.statusId,
     statusIsFinal: o.status.isFinal,
     originId: o.originId,

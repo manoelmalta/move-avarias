@@ -1,119 +1,71 @@
 import type {
   ClosingReportOccurrence,
   ClosingReportFilters,
-  MonthlyChartDatum,
-  MonthlyTableRow,
+  YearlyMonthData,
   ProductGroupRow,
 } from "./types";
 
-const MONTH_LABELS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+const MONTH_LABELS = [
+  "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
+  "Jul", "Ago", "Set", "Out", "Nov", "Dez",
+];
 
-/**
- * Returns the list of months to display in charts and the apuração table.
- * - No date filter → last 12 months
- * - dateFrom only → from that month to current
- * - dateTo only → last 12 months up to that month
- * - Both → range capped at 36 months to avoid rendering too many columns
- */
-export function getMonthRange(
-  dateFrom: string,
-  dateTo: string
-): Array<{ month: string; label: string }> {
-  const now = new Date();
-
-  let start: Date;
-  let end: Date;
-
-  if (dateFrom) {
-    const d = new Date(dateFrom + "T12:00:00");
-    start = new Date(d.getFullYear(), d.getMonth(), 1);
-  } else {
-    start = new Date(now.getFullYear(), now.getMonth() - 11, 1);
-  }
-
-  if (dateTo) {
-    const d = new Date(dateTo + "T12:00:00");
-    end = new Date(d.getFullYear(), d.getMonth(), 1);
-  } else {
-    end = new Date(now.getFullYear(), now.getMonth(), 1);
-  }
-
-  // Sanity: end must be >= start
-  if (end < start) end = new Date(start);
-
-  const result: Array<{ month: string; label: string }> = [];
-  const cur = new Date(start);
-  let safety = 0;
-
-  while (cur <= end && safety < 36) {
-    const m = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}`;
-    const lbl = `${MONTH_LABELS[cur.getMonth()]}/${String(cur.getFullYear()).slice(2)}`;
-    result.push({ month: m, label: lbl });
-    cur.setMonth(cur.getMonth() + 1);
-    safety++;
-  }
-
-  return result;
+/** Returns the 12 fixed months for a given year. */
+export function getYearMonths(year: number): Array<{ month: string; label: string }> {
+  return MONTH_LABELS.map((label, i) => ({
+    month: `${year}-${String(i + 1).padStart(2, "0")}`,
+    label,
+  }));
 }
 
 /**
- * Aggregates occurrence totals into monthly chart series.
- * Opened: bucket by occurrence.createdAt month, sum all items totalValue.
- * Closed: bucket by occurrence.completedAt month, same sum.
+ * Returns a sorted (descending) list of years present in the occurrence data.
+ * Always includes the current calendar year.
  */
-export function computeMonthlyChartData(
+export function getAvailableYears(occurrences: ClosingReportOccurrence[]): number[] {
+  const years = new Set<number>();
+  years.add(new Date().getFullYear());
+  for (const occ of occurrences) {
+    years.add(Number(occ.createdAtIso.substring(0, 4)));
+    if (occ.completedAtIso) years.add(Number(occ.completedAtIso.substring(0, 4)));
+    years.add(Number(occ.updatedAtIso.substring(0, 4)));
+  }
+  return [...years].sort((a, b) => b - a);
+}
+
+/**
+ * Computes opened and finalized monetary values for every month in the given year.
+ *
+ * "Opened" = occurrence created in that month (by createdAt).
+ *
+ * "Finalized" = occurrence where statusIsFinal === true.
+ *   Temporal bucket uses:
+ *   1. completedAt if it is set — the authoritative completion timestamp.
+ *   2. updatedAt as fallback — best available estimate when completedAt was not
+ *      recorded at the time the status was set to final (data-entry gap).
+ *
+ * Rationale: the pipeline column view groups occurrences by status (isFinal=true),
+ * regardless of completedAt. Aligning the report to that same concept ensures
+ * consistency with the operational view and prevents silent under-counting of
+ * occurrences that were effectively closed but never had completedAt written.
+ */
+export function computeYearlyData(
   occurrences: ClosingReportOccurrence[],
-  months: Array<{ month: string; label: string }>
-): { opened: MonthlyChartDatum[]; closed: MonthlyChartDatum[] } {
+  year: number
+): YearlyMonthData[] {
+  const months = getYearMonths(year);
   const openedMap = new Map<string, number>();
   const closedMap = new Map<string, number>();
 
   for (const occ of occurrences) {
     const occValue = occ.items.reduce((s, i) => s + i.totalValue, 0);
+
     const openedMonth = occ.createdAtIso.substring(0, 7);
     openedMap.set(openedMonth, (openedMap.get(openedMonth) ?? 0) + occValue);
 
-    if (occ.completedAtIso) {
-      const closedMonth = occ.completedAtIso.substring(0, 7);
-      closedMap.set(closedMonth, (closedMap.get(closedMonth) ?? 0) + occValue);
-    }
-  }
-
-  const opened: MonthlyChartDatum[] = months.map(({ month, label }) => ({
-    month,
-    label,
-    value: openedMap.get(month) ?? 0,
-  }));
-
-  const closed: MonthlyChartDatum[] = months.map(({ month, label }) => ({
-    month,
-    label,
-    value: closedMap.get(month) ?? 0,
-  }));
-
-  return { opened, closed };
-}
-
-/**
- * Builds the rows for the monthly apuração table (opened + closed values per month).
- * The billing (faturado) value is provided separately as a Record<month, number> and
- * merged in the component so the table can re-render reactively on input changes.
- */
-export function computeMonthlyTableRows(
-  occurrences: ClosingReportOccurrence[],
-  months: Array<{ month: string; label: string }>
-): MonthlyTableRow[] {
-  const openedMap = new Map<string, number>();
-  const closedMap = new Map<string, number>();
-
-  for (const occ of occurrences) {
-    const occValue = occ.items.reduce((s, i) => s + i.totalValue, 0);
-    const openedMonth = occ.createdAtIso.substring(0, 7);
-    openedMap.set(openedMonth, (openedMap.get(openedMonth) ?? 0) + occValue);
-
-    if (occ.completedAtIso) {
-      const closedMonth = occ.completedAtIso.substring(0, 7);
-      closedMap.set(closedMonth, (closedMap.get(closedMonth) ?? 0) + occValue);
+    if (occ.statusIsFinal) {
+      const finalMonth = (occ.completedAtIso ?? occ.updatedAtIso).substring(0, 7);
+      closedMap.set(finalMonth, (closedMap.get(finalMonth) ?? 0) + occValue);
     }
   }
 
@@ -125,7 +77,7 @@ export function computeMonthlyTableRows(
   }));
 }
 
-/** Applies all closing report filters to occurrences. */
+/** Applies all closing-report detail filters to occurrences (items section only). */
 export function applyClosingFilters(
   occurrences: ClosingReportOccurrence[],
   filters: ClosingReportFilters
@@ -144,8 +96,11 @@ export function applyClosingFilters(
 }
 
 /**
- * Groups items by product across filtered occurrences.
- * Returns rows sorted descending by totalValue.
+ * Groups items by product across the filtered occurrences.
+ * Sorted descending by totalValue.
+ *
+ * finalizedValue = sum of item.totalValue for items belonging to occurrences
+ * where statusIsFinal === true within the current filter set.
  */
 export function computeProductGroups(
   occurrences: ClosingReportOccurrence[]
@@ -158,6 +113,7 @@ export function computeProductGroups(
       description: string;
       totalQuantity: number;
       totalValue: number;
+      finalizedValue: number;
       occurrenceIds: Set<string>;
     }
   >();
@@ -171,12 +127,16 @@ export function computeProductGroups(
           description: item.productDescription,
           totalQuantity: 0,
           totalValue: 0,
+          finalizedValue: 0,
           occurrenceIds: new Set(),
         });
       }
       const entry = productMap.get(item.productId)!;
       entry.totalQuantity += item.quantity;
       entry.totalValue = Math.round((entry.totalValue + item.totalValue) * 100) / 100;
+      if (occ.statusIsFinal) {
+        entry.finalizedValue = Math.round((entry.finalizedValue + item.totalValue) * 100) / 100;
+      }
       entry.occurrenceIds.add(occ.id);
     }
   }
@@ -189,7 +149,7 @@ export function computeProductGroups(
     .sort((a, b) => b.totalValue - a.totalValue);
 }
 
-/** Safe percentage: returns "—" when denominator is zero or falsy. */
+/** Safe percentage — returns "—" when denominator is zero or falsy. */
 export function safePct(numerator: number, denominator: number): string {
   if (!denominator || denominator <= 0) return "—";
   return `${((numerator / denominator) * 100).toFixed(1)}%`;

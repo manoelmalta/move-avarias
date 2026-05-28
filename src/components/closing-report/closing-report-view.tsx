@@ -1,13 +1,12 @@
 "use client";
 import { useState, useMemo, useCallback } from "react";
-import { FileText, Download, Sheet, AlertTriangle } from "lucide-react";
+import { FileText, Download, Sheet, AlertTriangle, CalendarDays, SlidersHorizontal } from "lucide-react";
 import type { ClosingReportOccurrence, ClosingReportParam } from "@/lib/closing-report/types";
 import { EMPTY_CLOSING_FILTERS } from "@/lib/closing-report/types";
 import type { DashboardFilters } from "@/lib/dashboard/types";
 import {
-  getMonthRange,
-  computeMonthlyChartData,
-  computeMonthlyTableRows,
+  getAvailableYears,
+  computeYearlyData,
   applyClosingFilters,
   computeProductGroups,
 } from "@/lib/closing-report/metrics";
@@ -27,6 +26,27 @@ interface ClosingReportViewProps {
   userParams: { id: string; name: string }[];
 }
 
+// ── Style helpers ──────────────────────────────────────────────────────────────
+
+const fieldClass =
+  "rounded-md px-2.5 py-1.5 text-sm outline-none cursor-pointer transition-colors focus:ring-2 focus:ring-offset-0";
+
+const fieldStyle: React.CSSProperties = {
+  background: "#FFFFFF",
+  border: "1px solid #DDE7DE",
+  color: "#1C2A24",
+};
+
+const labelStyle: React.CSSProperties = {
+  color: "#6B756F",
+  fontSize: "10px",
+  textTransform: "uppercase",
+  letterSpacing: "0.12em",
+  fontWeight: 600,
+};
+
+// ── Component ──────────────────────────────────────────────────────────────────
+
 export function ClosingReportView({
   occurrences,
   statusParams,
@@ -35,82 +55,82 @@ export function ClosingReportView({
   destinationParams,
   userParams,
 }: ClosingReportViewProps) {
-  const [filters, setFilters] = useState<DashboardFilters>(EMPTY_CLOSING_FILTERS);
+  // ── Gerencial filter (year) ──────────────────────────────────────────────────
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+
+  // ── Billing (local, per month) ───────────────────────────────────────────────
   const [billingByMonth, setBillingByMonth] = useState<Record<string, string>>({});
+
+  // ── Detail filter (items table) ──────────────────────────────────────────────
+  const [itemFilters, setItemFilters] = useState<DashboardFilters>(EMPTY_CLOSING_FILTERS);
+
+  // ── Export state ─────────────────────────────────────────────────────────────
   const [exportingCsv, setExportingCsv] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
 
-  // Month range is driven only by dateFrom / dateTo (not by status/origin etc.)
-  const months = useMemo(
-    () => getMonthRange(filters.dateFrom, filters.dateTo),
-    [filters.dateFrom, filters.dateTo]
+  // ── Derived: available years ─────────────────────────────────────────────────
+  const availableYears = useMemo(
+    () => getAvailableYears(occurrences),
+    [occurrences]
   );
 
-  // Monthly chart series — derived from ALL occurrences bucketed into the month range
-  const { opened: openedChartData, closed: closedChartData } = useMemo(
-    () => computeMonthlyChartData(occurrences, months),
-    [occurrences, months]
+  // ── Gerencial: yearly chart + table data ─────────────────────────────────────
+  const yearlyData = useMemo(
+    () => computeYearlyData(occurrences, selectedYear),
+    [occurrences, selectedYear]
   );
 
-  // Monthly table rows (same bucket logic)
-  const monthlyRows = useMemo(
-    () => computeMonthlyTableRows(occurrences, months),
-    [occurrences, months]
+  const openedChartData = useMemo(
+    () => yearlyData.map((d) => ({ label: d.label, value: d.openedValue })),
+    [yearlyData]
   );
 
-  // Filtered occurrences (all filters, for items table)
+  const closedChartData = useMemo(
+    () => yearlyData.map((d) => ({ label: d.label, value: d.closedValue })),
+    [yearlyData]
+  );
+
+  // Header stats: totals for the selected year
+  const totalOpenedValue = useMemo(
+    () => yearlyData.reduce((s, d) => s + d.openedValue, 0),
+    [yearlyData]
+  );
+  const totalClosedValue = useMemo(
+    () => yearlyData.reduce((s, d) => s + d.closedValue, 0),
+    [yearlyData]
+  );
+
+  // ── Detail: filtered occurrences → product groups ───────────────────────────
   const filteredOccurrences = useMemo(
-    () => applyClosingFilters(occurrences, filters),
-    [occurrences, filters]
+    () => applyClosingFilters(occurrences, itemFilters),
+    [occurrences, itemFilters]
   );
 
-  // Product groups for items table
   const productGroups = useMemo(
     () => computeProductGroups(filteredOccurrences),
     [filteredOccurrences]
   );
 
-  // Aggregate totals
+  // Aggregate totals for the items table
   const totalQuantity = productGroups.reduce((s, r) => s + r.totalQuantity, 0);
   const totalValue = productGroups.reduce((s, r) => s + r.totalValue, 0);
-  // Distinct occurrence count: all filtered occurrences that have items
+  const totalFinalizedValue = productGroups.reduce((s, r) => s + r.finalizedValue, 0);
   const totalDistinctOccurrences = filteredOccurrences.filter((o) => o.items.length > 0).length;
 
-  // Quick stats for the header
-  const totalOpenedValue = useMemo(
-    () =>
-      occurrences
-        .filter((o) => {
-          const d = o.createdAtIso.substring(0, 10);
-          const from = months[0]?.month.replace(/-/g, "") ?? "";
-          const to = months[months.length - 1]?.month.replace(/-/g, "") ?? "";
-          const dm = d.substring(0, 7).replace(/-/g, "");
-          return (!from || dm >= from) && (!to || dm <= to);
-        })
-        .reduce((s, o) => s + o.items.reduce((ss, i) => ss + i.totalValue, 0), 0),
-    [occurrences, months]
-  );
-  const totalClosedValue = useMemo(
-    () =>
-      occurrences
-        .filter((o) => {
-          if (!o.completedAtIso) return false;
-          const dm = o.completedAtIso.substring(0, 7);
-          const from = months[0]?.month ?? "";
-          const to = months[months.length - 1]?.month ?? "";
-          return (!from || dm >= from) && (!to || dm <= to);
-        })
-        .reduce((s, o) => s + o.items.reduce((ss, i) => ss + i.totalValue, 0), 0),
-    [occurrences, months]
-  );
-
-  // --- Export CSV ---
+  // ── Export CSV ───────────────────────────────────────────────────────────────
   const handleExportCsv = useCallback(() => {
     if (productGroups.length === 0) return;
     setExportingCsv(true);
     try {
       const today = new Date().toISOString().slice(0, 10);
-      const header = ["codigo_interno", "descricao", "quantidade", "valor_total", "processos"];
+      const header = [
+        "codigo_interno",
+        "descricao",
+        "quantidade",
+        "valor_total",
+        "valor_finalizado",
+        "processos",
+      ];
       const fmtNum = (n: number) =>
         n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       const lines = [
@@ -121,15 +141,16 @@ export function ClosingReportView({
             `"${r.description.replace(/"/g, '""')}"`,
             r.totalQuantity.toLocaleString("pt-BR", { maximumFractionDigits: 3 }),
             fmtNum(r.totalValue),
+            fmtNum(r.finalizedValue),
             r.occurrenceCount,
           ].join(";")
         ),
-        // Total row
         [
           "TOTAL",
           `"${productGroups.length} produto(s)"`,
           totalQuantity.toLocaleString("pt-BR", { maximumFractionDigits: 3 }),
           fmtNum(totalValue),
+          fmtNum(totalFinalizedValue),
           totalDistinctOccurrences,
         ].join(";"),
       ];
@@ -146,9 +167,9 @@ export function ClosingReportView({
     } finally {
       setExportingCsv(false);
     }
-  }, [productGroups, totalQuantity, totalValue, totalDistinctOccurrences]);
+  }, [productGroups, totalQuantity, totalValue, totalFinalizedValue, totalDistinctOccurrences]);
 
-  // --- Export Excel (xlsx devDep) ---
+  // ── Export Excel ─────────────────────────────────────────────────────────────
   const handleExportXlsx = useCallback(async () => {
     if (productGroups.length === 0) return;
     setExportingXlsx(true);
@@ -156,45 +177,49 @@ export function ClosingReportView({
       const XLSX = await import("xlsx");
       const today = new Date().toISOString().slice(0, 10);
       const periodLabel =
-        filters.dateFrom || filters.dateTo
-          ? `${filters.dateFrom || "…"} a ${filters.dateTo || "…"}`
-          : "Últimos 12 meses";
+        itemFilters.dateFrom || itemFilters.dateTo
+          ? `${itemFilters.dateFrom || "…"} a ${itemFilters.dateTo || "…"}`
+          : `Ano ${selectedYear} (visão gerencial) · sem filtro de data no detalhamento`;
 
       const wsData: (string | number)[][] = [
-        // Meta header
         ["Relatório de Fechamento — Itens Avariados"],
         [`Período: ${periodLabel}`],
         [`Gerado em: ${new Date().toLocaleString("pt-BR")}`],
         [],
-        // Column headers
-        ["Cód. Interno", "Descrição", "Quantidade", "Valor Total (R$)", "Processos"],
-        // Data rows
+        [
+          "Cód. Interno",
+          "Descrição",
+          "Quantidade",
+          "Valor Total (R$)",
+          "Valor Finalizado (R$)",
+          "Processos",
+        ],
         ...productGroups.map((r) => [
           r.internalCode,
           r.description,
           r.totalQuantity,
           r.totalValue,
+          r.finalizedValue,
           r.occurrenceCount,
         ]),
-        // Total
         [
           "TOTAL",
           `${productGroups.length} produto(s)`,
           totalQuantity,
           totalValue,
+          totalFinalizedValue,
           totalDistinctOccurrences,
         ],
       ];
 
       const ws = XLSX.utils.aoa_to_sheet(wsData);
-
-      // Column widths
       ws["!cols"] = [
-        { wch: 18 },  // Cód. Interno
-        { wch: 48 },  // Descrição
-        { wch: 14 },  // Quantidade
-        { wch: 20 },  // Valor Total
-        { wch: 12 },  // Processos
+        { wch: 18 }, // Cód. Interno
+        { wch: 44 }, // Descrição
+        { wch: 14 }, // Quantidade
+        { wch: 20 }, // Valor Total
+        { wch: 22 }, // Valor Finalizado
+        { wch: 12 }, // Processos
       ];
 
       const wb = XLSX.utils.book_new();
@@ -206,16 +231,21 @@ export function ClosingReportView({
     } finally {
       setExportingXlsx(false);
     }
-  }, [productGroups, totalQuantity, totalValue, totalDistinctOccurrences, filters]);
+  }, [
+    productGroups,
+    totalQuantity,
+    totalValue,
+    totalFinalizedValue,
+    totalDistinctOccurrences,
+    itemFilters,
+    selectedYear,
+  ]);
 
-  const periodLabel =
-    months.length > 0
-      ? `${months[0].label} – ${months[months.length - 1].label}`
-      : "—";
+  // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-6 pb-8">
-      {/* ── Page Header ─────────────────────────────────────────────── */}
+      {/* ── Page Header ─────────────────────────────────────────────────────── */}
       <div
         className="rounded-xl px-6 py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
         style={{
@@ -235,7 +265,8 @@ export function ClosingReportView({
             </h1>
           </div>
           <p className="text-[12px] mt-1" style={{ color: "#6B756F" }}>
-            Período visualizado: <strong style={{ color: "#1C2A24" }}>{periodLabel}</strong>
+            Visão gerencial:{" "}
+            <strong style={{ color: "#1C2A24" }}>Jan–Dez {selectedYear}</strong>
             &nbsp;·&nbsp;
             <span className="tabular-nums">
               {fmtCurrency(totalOpenedValue)} em abertos
@@ -284,11 +315,54 @@ export function ClosingReportView({
         </div>
       </div>
 
-      {/* ── Section 1: Line Charts ───────────────────────────────────── */}
+      {/* ── Section 1: Gerencial Filter (Year) ──────────────────────────────── */}
+      <div
+        className="rounded-xl px-5 py-4"
+        style={{
+          background: "#FFFFFF",
+          border: "1px solid #DDE7DE",
+          boxShadow: "0 1px 2px rgba(8,56,51,0.03)",
+        }}
+      >
+        <div className="flex items-start gap-2 mb-3">
+          <CalendarDays className="h-4 w-4 mt-0.5 shrink-0" style={{ color: "#0D6F65" }} />
+          <div>
+            <h3
+              className="text-[12px] font-semibold uppercase tracking-wider"
+              style={{ color: "#6B756F" }}
+            >
+              Filtro — Visão Gerencial
+            </h3>
+            <p className="text-[11px] mt-0.5" style={{ color: "#9AA59F" }}>
+              Aplica-se aos gráficos de linha e à tabela de apuração mensal.
+              O detalhamento de itens possui filtros próprios abaixo.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-end gap-3">
+          <div className="flex flex-col gap-1">
+            <span style={labelStyle}>Ano</span>
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(Number(e.target.value))}
+              className={fieldClass}
+              style={{ ...fieldStyle, minWidth: 100 }}
+            >
+              {availableYears.map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Section 2: Line Charts ───────────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <ExpandableChartCard
           title="Valor de Processos Finalizados por Mês"
-          subtitle="Soma do valor dos itens das ocorrências concluídas, pela data de finalização"
+          subtitle={`Soma do valor dos itens das ocorrências em status final, por mês — ${selectedYear}`}
           height={240}
           expandedHeight={480}
         >
@@ -300,7 +374,7 @@ export function ClosingReportView({
         </ExpandableChartCard>
         <ExpandableChartCard
           title="Valor de Processos Abertos por Mês"
-          subtitle="Soma do valor dos itens das ocorrências abertas, pela data de criação"
+          subtitle={`Soma do valor dos itens das ocorrências abertas, pela data de criação — ${selectedYear}`}
           height={240}
           expandedHeight={480}
         >
@@ -312,46 +386,14 @@ export function ClosingReportView({
         </ExpandableChartCard>
       </div>
 
-      {/* ── Section 2: Monthly Apuração Table ───────────────────────── */}
+      {/* ── Section 3: Monthly Apuração Table ───────────────────────────────── */}
       <MonthlyTable
-        rows={monthlyRows}
+        yearlyData={yearlyData}
         billingByMonth={billingByMonth}
         onBillingChange={setBillingByMonth}
       />
 
-      {/* ── Section 3: Filters ──────────────────────────────────────── */}
-      <div
-        className="rounded-xl px-5 py-4"
-        style={{
-          background: "#FFFFFF",
-          border: "1px solid #DDE7DE",
-          boxShadow: "0 1px 2px rgba(8,56,51,0.03)",
-        }}
-      >
-        <div className="mb-3">
-          <h3
-            className="text-[12px] font-semibold uppercase tracking-wider"
-            style={{ color: "#6B756F" }}
-          >
-            Filtros — Detalhamento de Itens
-          </h3>
-          <p className="text-[11px] mt-1" style={{ color: "#9AA59F" }}>
-            Os filtros abaixo se aplicam ao detalhamento de itens avariados. A visão mensal (gráficos e apuração) considera apenas o período selecionado.
-          </p>
-        </div>
-        <FilterBar
-          filters={filters}
-          onChange={setFilters}
-          onClear={() => setFilters(EMPTY_CLOSING_FILTERS)}
-          statuses={statusParams}
-          origins={originParams}
-          damageTypes={damageTypeParams}
-          destinations={destinationParams}
-          users={userParams}
-        />
-      </div>
-
-      {/* ── Alert Banner ────────────────────────────────────────────── */}
+      {/* ── Alert Banner ────────────────────────────────────────────────────── */}
       <div
         className="rounded-xl px-5 py-4 flex items-start gap-3"
         style={{
@@ -369,7 +411,43 @@ export function ClosingReportView({
         </p>
       </div>
 
-      {/* ── Section 4: Items Table ───────────────────────────────────── */}
+      {/* ── Section 4: Detail Filters ────────────────────────────────────────── */}
+      <div
+        className="rounded-xl px-5 py-4"
+        style={{
+          background: "#FFFFFF",
+          border: "1px solid #DDE7DE",
+          boxShadow: "0 1px 2px rgba(8,56,51,0.03)",
+        }}
+      >
+        <div className="flex items-start gap-2 mb-3">
+          <SlidersHorizontal className="h-4 w-4 mt-0.5 shrink-0" style={{ color: "#0D6F65" }} />
+          <div>
+            <h3
+              className="text-[12px] font-semibold uppercase tracking-wider"
+              style={{ color: "#6B756F" }}
+            >
+              Filtros — Detalhamento de Itens
+            </h3>
+            <p className="text-[11px] mt-0.5" style={{ color: "#9AA59F" }}>
+              Aplica-se exclusivamente à tabela de itens avariados abaixo.
+              Os gráficos e a apuração mensal usam apenas o filtro de ano acima.
+            </p>
+          </div>
+        </div>
+        <FilterBar
+          filters={itemFilters}
+          onChange={setItemFilters}
+          onClear={() => setItemFilters(EMPTY_CLOSING_FILTERS)}
+          statuses={statusParams}
+          origins={originParams}
+          damageTypes={damageTypeParams}
+          destinations={destinationParams}
+          users={userParams}
+        />
+      </div>
+
+      {/* ── Section 5: Items Table ───────────────────────────────────────────── */}
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -384,7 +462,8 @@ export function ClosingReportView({
               {productGroups.length === 1 ? "produto" : "produtos"} ·{" "}
               {totalDistinctOccurrences}{" "}
               {totalDistinctOccurrences === 1 ? "processo" : "processos"} ·{" "}
-              {fmtCurrency(totalValue)} total
+              {fmtCurrency(totalValue)} total ·{" "}
+              {fmtCurrency(totalFinalizedValue)} finalizado
             </p>
           </div>
         </div>
@@ -392,6 +471,7 @@ export function ClosingReportView({
           rows={productGroups}
           totalQuantity={totalQuantity}
           totalValue={totalValue}
+          totalFinalizedValue={totalFinalizedValue}
           totalDistinctOccurrences={totalDistinctOccurrences}
         />
       </div>
