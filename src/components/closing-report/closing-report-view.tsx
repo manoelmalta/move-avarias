@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, createElement } from "react";
 import { FileText, Download, Sheet, AlertTriangle, CalendarDays, SlidersHorizontal } from "lucide-react";
 import type { ClosingReportOccurrence, ClosingReportParam } from "@/lib/closing-report/types";
 import { EMPTY_CLOSING_FILTERS } from "@/lib/closing-report/types";
@@ -67,6 +67,7 @@ export function ClosingReportView({
   // ── Export state ─────────────────────────────────────────────────────────────
   const [exportingCsv, setExportingCsv] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   // ── Derived: available years ─────────────────────────────────────────────────
   const availableYears = useMemo(
@@ -241,6 +242,61 @@ export function ClosingReportView({
     selectedYear,
   ]);
 
+  // ── Export PDF ───────────────────────────────────────────────────────────────
+  const handleExportPdf = useCallback(async () => {
+    setExportingPdf(true);
+    try {
+      const { pdf } = await import("@react-pdf/renderer");
+      const { ClosingReportPdf } = await import(
+        "@/components/closing-report/pdf-export"
+      );
+      const now = new Date();
+      const generatedAt = now.toLocaleString("pt-BR", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      const element = createElement(ClosingReportPdf, {
+        selectedYear,
+        generatedAt,
+        yearlyData,
+        billingByMonth,
+        productGroups,
+        totalQuantity,
+        totalValue,
+        totalFinalizedValue,
+        totalDistinctOccurrences,
+      });
+      // pdf() expects ReactElement<DocumentProps>; ClosingReportPdf renders a
+      // Document internally, so this is safe at runtime. We cast via unknown
+      // because TypeScript cannot infer the JSX return type from createElement.
+      type PdfArg = Parameters<typeof pdf>[0];
+      const blob = await pdf(element as unknown as PdfArg).toBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `relatorio-fechamento-${selectedYear}-${now.toISOString().slice(0, 10)}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error("Erro ao exportar PDF:", e);
+      alert("Não foi possível exportar o arquivo PDF. Tente novamente.");
+    } finally {
+      setExportingPdf(false);
+    }
+  }, [
+    selectedYear,
+    yearlyData,
+    billingByMonth,
+    productGroups,
+    totalQuantity,
+    totalValue,
+    totalFinalizedValue,
+    totalDistinctOccurrences,
+  ]);
+
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
@@ -311,6 +367,22 @@ export function ClosingReportView({
           >
             <Sheet className="h-3.5 w-3.5" />
             Excel
+          </button>
+          <button
+            type="button"
+            onClick={handleExportPdf}
+            disabled={exportingPdf}
+            className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-lg transition-colors"
+            style={{
+              background: "#FFFFFF",
+              border: "1px solid #DDE7DE",
+              color: exportingPdf ? "#9AA59F" : "#1C2A24",
+              cursor: exportingPdf ? "default" : "pointer",
+            }}
+            title={exportingPdf ? "Gerando PDF…" : "Exportar PDF completo"}
+          >
+            <FileText className="h-3.5 w-3.5" />
+            {exportingPdf ? "PDF…" : "PDF"}
           </button>
         </div>
       </div>
