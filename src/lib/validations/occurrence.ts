@@ -28,6 +28,14 @@ export const UpdateOccurrenceSchema = z.object({
   originId: z.string().optional(),
 });
 
+export const UpdateOccurrenceItemSchema = z.object({
+  quantity: z.number().positive("Quantidade deve ser maior que zero").optional(),
+  unitValue: z.number().min(0, "Valor unitário inválido").optional(),
+}).refine((d) => d.quantity !== undefined || d.unitValue !== undefined, {
+  message: "Informe ao menos quantity ou unitValue",
+});
+
 export type CreateOccurrenceInput = z.infer<typeof CreateOccurrenceSchema>;
 export type UpdateOccurrenceInput = z.infer<typeof UpdateOccurrenceSchema>;
 export type OccurrenceItemInput = z.infer<typeof OccurrenceItemSchema>;
+export type UpdateOccurrenceItemInput = z.infer<typeof UpdateOccurrenceItemSchema>;

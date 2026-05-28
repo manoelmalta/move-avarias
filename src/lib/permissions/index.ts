@@ -10,6 +10,8 @@ type Permission =
   | "occurrence:edit_operational"
   | "occurrence:complete"
   | "occurrence:edit_any_field"
+  | "occurrence:edit_items"
+  | "occurrence:delete"
   | "product:manage"
   | "price:manage"
   | "parameter:manage"
@@ -32,6 +34,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "occurrence:edit_status",
     "occurrence:edit_destination",
     "occurrence:complete",
+    "occurrence:edit_items",
     "dashboard:indicators",
     "product:manage",
     "price:manage",
@@ -49,6 +52,8 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "occurrence:edit_destination",
     "occurrence:complete",
     "occurrence:edit_any_field",
+    "occurrence:edit_items",
+    "occurrence:delete",
     "dashboard:indicators",
     "product:manage",
     "price:manage",
