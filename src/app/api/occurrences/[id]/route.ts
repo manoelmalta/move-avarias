@@ -50,6 +50,34 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   return NextResponse.json(occurrence);
 }
 
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const session = await auth();
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { user } = session;
+
+  if (!hasPermission(user, "occurrence:delete")) {
+    return NextResponse.json({ error: "Sem permissão para apagar ocorrências" }, { status: 403 });
+  }
+
+  const { id } = await params;
+  const occurrence = await prisma.damageOccurrence.findUnique({
+    where: { id },
+    select: { id: true, clientId: true, occurrenceCode: true },
+  });
+  if (!occurrence || occurrence.clientId !== user.clientId) {
+    return NextResponse.json({ error: "Ocorrência não encontrada" }, { status: 404 });
+  }
+
+  // Delete in transaction: audit logs → items → occurrence
+  await prisma.$transaction([
+    prisma.auditLog.deleteMany({ where: { occurrenceId: id } }),
+    prisma.damageOccurrenceItem.deleteMany({ where: { occurrenceId: id } }),
+    prisma.damageOccurrence.delete({ where: { id } }),
+  ]);
+
+  return NextResponse.json({ ok: true, deleted: occurrence.occurrenceCode });
+}
+
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

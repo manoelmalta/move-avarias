@@ -22,11 +22,12 @@ async function getOccurrence(id: string) {
 }
 
 async function getParameters(clientId: string) {
-  const [statuses, destinations] = await Promise.all([
+  const [statuses, destinations, damageTypes] = await Promise.all([
     prisma.parameterStatus.findMany({ where: { clientId, active: true }, orderBy: { funnelOrder: "asc" } }),
     prisma.parameterDestination.findMany({ where: { clientId, active: true }, orderBy: { sortOrder: "asc" } }),
+    prisma.parameterDamageType.findMany({ where: { clientId, active: true }, orderBy: { sortOrder: "asc" } }),
   ]);
-  return { statuses, destinations };
+  return { statuses, destinations, damageTypes };
 }
 
 export default async function OccurrenceDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -47,7 +48,7 @@ export default async function OccurrenceDetailPage({ params }: { params: Promise
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
-      <OccurrenceDetail occurrence={occurrence} statuses={parameters.statuses} destinations={parameters.destinations} />
+      <OccurrenceDetail occurrence={occurrence} statuses={parameters.statuses} destinations={parameters.destinations} damageTypes={parameters.damageTypes} />
     </div>
   );
 }
