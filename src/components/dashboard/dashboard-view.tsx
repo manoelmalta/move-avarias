@@ -69,8 +69,7 @@ export function DashboardView({
 
   const canSeeUserRanking = userRole === "GESTOR" || userRole === "ADMIN";
   const hasIncompleteValues = m.zeroValueItems > 0;
-  const avgDaysLabel =
-    m.avgClosingDays !== null ? `${m.avgClosingDays.toFixed(1)} dias` : "—";
+  const avgDaysLabel = `${m.avgCycleDays.toFixed(1)} dias`;
   const activeFilters = Object.values(filters).filter(Boolean).length;
   const periodLabel = formatPeriodLabel(filters);
 
@@ -196,20 +195,15 @@ export function DashboardView({
             }
           />
           <StatCard
-            label="Tempo médio de fechamento"
+            label="Tempo médio em ciclo"
             value={avgDaysLabel}
             accent="#1A8B80"
             aux={
-              m.closedOccurrences > 0
-                ? `${m.closedOccurrences} concluída${m.closedOccurrences !== 1 ? "s" : ""}`
+              m.totalOccurrences > 0
+                ? `${m.totalOccurrences} ocorrência${m.totalOccurrences !== 1 ? "s" : ""}`
                 : undefined
             }
-            sub={
-              m.closedOccurrences > 0
-                ? "Intervalo médio entre abertura e conclusão das ocorrências finalizadas"
-                : "Sem fechamentos no período filtrado"
-            }
-            dim={m.closedOccurrences === 0}
+            sub="Média de dias entre abertura e finalização; para ocorrências abertas, considera até hoje."
           />
         </section>
 
