@@ -17,6 +17,8 @@ export interface ClosingReportOccurrence {
   occurrenceCode: string;
   createdAtIso: string;
   completedAtIso: string | null;
+  /** updatedAt ISO — used as fallback bucket date for finalized occurrences missing completedAt. */
+  updatedAtIso: string;
   statusId: string;
   statusIsFinal: boolean;
   originId: string;
@@ -25,14 +27,14 @@ export interface ClosingReportOccurrence {
   items: ClosingReportItem[];
 }
 
-export interface MonthlyChartDatum {
+/**
+ * Monthly data for a specific year, used by both line charts and the transposed
+ * apuração table. One entry per calendar month (12 total).
+ */
+export interface YearlyMonthData {
+  /** "YYYY-MM" */
   month: string;
-  label: string;
-  value: number;
-}
-
-export interface MonthlyTableRow {
-  month: string;
+  /** Short month label: "Jan", "Fev", etc. */
   label: string;
   openedValue: number;
   closedValue: number;
@@ -44,5 +46,7 @@ export interface ProductGroupRow {
   description: string;
   totalQuantity: number;
   totalValue: number;
+  /** Sum of totalValue for items belonging to occurrences where statusIsFinal = true. */
+  finalizedValue: number;
   occurrenceCount: number;
 }
