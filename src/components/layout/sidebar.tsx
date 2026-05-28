@@ -12,6 +12,7 @@ import {
   Settings,
   Users,
   X,
+  FileBarChart2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSession } from "@/lib/auth/session-context";
@@ -34,6 +35,9 @@ export function Sidebar({ onMobileClose }: SidebarProps = {}) {
     ? [
         ...(hasPermission(user, "dashboard:indicators")
           ? [{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard }]
+          : []),
+        ...(hasPermission(user, "dashboard:indicators")
+          ? [{ href: "/closing-report", label: "Rel. Fechamento", icon: FileBarChart2 }]
           : []),
         ...(hasPermission(user, "occurrence:view_all") || hasPermission(user, "occurrence:view_own")
           ? [{ href: "/occurrences", label: "Ocorrências", icon: ClipboardList }]
@@ -118,6 +122,7 @@ export function Sidebar({ onMobileClose }: SidebarProps = {}) {
             // Exact-match-only routes: no sub-path activation
             const exactMatchOnly = new Set([
               "/dashboard",
+              "/closing-report",
               "/occurrences/new",
               "/occurrences/pipeline",
               "/products",
