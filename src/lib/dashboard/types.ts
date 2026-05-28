@@ -105,7 +105,8 @@ export interface DashboardMetrics {
   zeroValuePercent: number;
   uniqueProductsWithoutPrice: number;
   stuckOccurrences: number;
-  avgClosingDays: number | null;
+  /** Average days from open to close (closed) or to today (open). Always ≥ 0; 0 when no valid occurrences. */
+  avgCycleDays: number;
   byStatus: Array<ByKey & { order: number; isFinal: boolean }>;
   byOrigin: ByKey[];
   byDamageType: ByKey[];

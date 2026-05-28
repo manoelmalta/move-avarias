@@ -64,14 +64,21 @@ export function computeMetrics(
     return (now - new Date(o.createdAtIso).getTime()) / (1000 * 60 * 60 * 24) > stuckThresholdDays;
   }).length;
 
-  const completedWithDate = occurrences.filter((o) => o.completedAtIso !== null);
-  let avgClosingDays: number | null = null;
-  if (completedWithDate.length > 0) {
-    const totalMs = completedWithDate.reduce(
-      (s, o) => s + new Date(o.completedAtIso!).getTime() - new Date(o.createdAtIso).getTime(),
-      0
-    );
-    avgClosingDays = totalMs / completedWithDate.length / (1000 * 60 * 60 * 24);
+  // Tempo médio em ciclo: inclui todas as ocorrências com data de abertura válida.
+  // Ocorrências concluídas usam completedAt; abertas usam a data atual.
+  const MS_PER_DAY = 1000 * 60 * 60 * 24;
+  const validCycleOccurrences = occurrences.filter((o) => {
+    const t = new Date(o.createdAtIso).getTime();
+    return !isNaN(t);
+  });
+  let avgCycleDays = 0;
+  if (validCycleOccurrences.length > 0) {
+    const totalMs = validCycleOccurrences.reduce((s, o) => {
+      const openedMs = new Date(o.createdAtIso).getTime();
+      const baseMs = o.completedAtIso !== null ? new Date(o.completedAtIso).getTime() : now;
+      return s + Math.max(0, baseMs - openedMs);
+    }, 0);
+    avgCycleDays = totalMs / validCycleOccurrences.length / MS_PER_DAY;
   }
 
   // --- Categorical aggregations ---
@@ -199,7 +206,7 @@ export function computeMetrics(
     zeroValuePercent,
     uniqueProductsWithoutPrice,
     stuckOccurrences,
-    avgClosingDays,
+    avgCycleDays,
     byStatus,
     byOrigin,
     byDamageType,
