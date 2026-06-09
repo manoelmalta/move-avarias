@@ -56,13 +56,16 @@ async function getOccurrences(
     where.createdAt = createdAt;
   }
 
-  // lifecycle + completedAt range
+  // lifecycle filter — uses status.isFinal as the authoritative open/closed signal.
+  // completedAt date ranges filter by actual completion date and are kept on completedAt.
   const lifecycle = searchParams.lifecycle;
   if (lifecycle === "open") {
-    where.completedAt = null;
-  } else if (lifecycle === "closed" || searchParams.completedFrom || searchParams.completedTo) {
+    where.status = { isFinal: false };
+  } else if (lifecycle === "closed") {
+    where.status = { isFinal: true };
+  }
+  if (searchParams.completedFrom || searchParams.completedTo) {
     const completedAt: Record<string, unknown> = {};
-    if (lifecycle === "closed") completedAt.not = null;
     if (searchParams.completedFrom) completedAt.gte = new Date(searchParams.completedFrom);
     if (searchParams.completedTo)
       completedAt.lte = new Date(searchParams.completedTo + "T23:59:59");

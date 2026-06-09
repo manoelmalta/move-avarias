@@ -62,23 +62,23 @@ export default async function PipelinePage() {
         where: { clientId: user.clientId, active: true },
         orderBy: [{ funnelOrder: "asc" }, { name: "asc" }],
       }),
-      // All open occurrences (no completedAt) — fully loaded, sorted by age asc
+      // All open occurrences (status not final) — fully loaded, sorted by age asc
       // (client will re-sort by daysOpen desc within each column)
       prisma.damageOccurrence.findMany({
-        where: { ...scopeWhere, completedAt: null },
+        where: { ...scopeWhere, status: { isFinal: false } },
         select: occurrenceSelect,
         orderBy: { createdAt: "asc" },
       }),
-      // Closed occurrences — limited to CLOSED_LIMIT most recent
+      // Closed occurrences (status is final) — limited to CLOSED_LIMIT most recent
       prisma.damageOccurrence.findMany({
-        where: { ...scopeWhere, completedAt: { not: null } },
+        where: { ...scopeWhere, status: { isFinal: true } },
         select: occurrenceSelect,
-        orderBy: { completedAt: "desc" },
+        orderBy: [{ completedAt: "desc" }, { updatedAt: "desc" }],
         take: CLOSED_LIMIT,
       }),
       // Count total closed to detect whether limit was hit
       prisma.damageOccurrence.count({
-        where: { ...scopeWhere, completedAt: { not: null } },
+        where: { ...scopeWhere, status: { isFinal: true } },
       }),
     ]);
 

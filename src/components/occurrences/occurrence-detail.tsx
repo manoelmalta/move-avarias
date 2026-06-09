@@ -377,7 +377,9 @@ export function OccurrenceDetail({
       {isCompleted && (
         <div className="flex items-center gap-2 p-3 border border-green-200 bg-green-50 rounded-md text-sm text-green-800">
           <CheckCircle className="h-4 w-4 shrink-0" />
-          Ocorrência concluída em {formatDateTime(occ.completedAt)}
+          {occ.completedAt
+            ? <>Ocorrência concluída em {formatDateTime(occ.completedAt)}</>
+            : "Ocorrência concluída (data não registrada)"}
         </div>
       )}
 

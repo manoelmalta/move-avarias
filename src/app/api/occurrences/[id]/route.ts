@@ -142,10 +142,28 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       })
     : null;
 
+  // If a specific statusId was provided (without complete: true), look it up to
+  // check isFinal so we can stamp completedAt on a manual status-to-final change.
+  let newStatusIsFinal = false;
+  if (!complete && parsed.data.statusId) {
+    const targetStatus = await prisma.parameterStatus.findUnique({
+      where: { id: parsed.data.statusId },
+      select: { isFinal: true },
+    });
+    newStatusIsFinal = targetStatus?.isFinal ?? false;
+  }
+
   const updateData: Record<string, unknown> = { ...parsed.data };
   if (complete && finalStatus) {
     updateData.statusId = finalStatus.id;
     updateData.completedAt = new Date();
+  } else if (newStatusIsFinal && existing.completedAt === null) {
+    // Status changed to final via dropdown — stamp completedAt if not already set.
+    updateData.completedAt = new Date();
+  } else if (!newStatusIsFinal && parsed.data.statusId && existing.completedAt !== null) {
+    // Status moved away from final — clear completedAt so re-opened occurrences
+    // don't keep a stale conclusion date.
+    updateData.completedAt = null;
   }
 
   const updatedOccurrence = await prisma.damageOccurrence.update({

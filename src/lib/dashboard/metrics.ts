@@ -64,12 +64,17 @@ export function computeMetrics(
     return (now - new Date(o.createdAtIso).getTime()) / (1000 * 60 * 60 * 24) > stuckThresholdDays;
   }).length;
 
-  // Tempo médio em ciclo: inclui todas as ocorrências com data de abertura válida.
-  // Ocorrências concluídas usam completedAt; abertas usam a data atual.
+  // Tempo médio em ciclo:
+  // - Abertas: hoje - createdAt.
+  // - Finalizadas com completedAt: completedAt - createdAt.
+  // - Finalizadas sem completedAt (dados legados): excluídas do cálculo para não
+  //   distorcer a média usando hoje como proxy de conclusão.
   const MS_PER_DAY = 1000 * 60 * 60 * 24;
   const validCycleOccurrences = occurrences.filter((o) => {
     const t = new Date(o.createdAtIso).getTime();
-    return !isNaN(t);
+    if (isNaN(t)) return false;
+    if (o.statusIsFinal && o.completedAtIso === null) return false;
+    return true;
   });
   let avgCycleDays = 0;
   if (validCycleOccurrences.length > 0) {

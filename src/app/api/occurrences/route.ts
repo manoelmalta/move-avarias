@@ -56,17 +56,20 @@ export async function GET(req: NextRequest) {
     where.createdAt = createdAt;
   }
 
-  // lifecycle + completedAt range
+  // lifecycle filter — uses status.isFinal as the authoritative open/closed signal.
+  // completedAt date ranges are kept on completedAt since they filter by actual
+  // completion date (a display/cycle field), independent of lifecycle status.
   const lifecycle = search.get("lifecycle");
   const completedFrom = search.get("completedFrom");
   const completedTo = search.get("completedTo");
 
   if (lifecycle === "open") {
-    // Explicitly open — completedAt must be null; ignore completedFrom/To
-    where.completedAt = null;
-  } else if (lifecycle === "closed" || completedFrom || completedTo) {
+    where.status = { isFinal: false };
+  } else if (lifecycle === "closed") {
+    where.status = { isFinal: true };
+  }
+  if (completedFrom || completedTo) {
     const completedAt: Record<string, unknown> = {};
-    if (lifecycle === "closed") completedAt.not = null;
     if (completedFrom) completedAt.gte = new Date(completedFrom);
     if (completedTo) completedAt.lte = new Date(completedTo + "T23:59:59");
     where.completedAt = completedAt;

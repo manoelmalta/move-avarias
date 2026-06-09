@@ -146,7 +146,9 @@ function OccurrenceCard({
   occ: SerializedPipelineOccurrence;
   onView: (id: string) => void;
 }) {
-  const isClosed = occ.completedAt !== null;
+  // Use isFinal as the authoritative signal — completedAt may be null for legacy
+  // records that were finalized via status dropdown before this fix was applied.
+  const isClosed = occ.status.isFinal;
 
   // Days calculation
   const openDays = isClosed ? null : daysOpen(occ.createdAt);
@@ -155,11 +157,11 @@ function OccurrenceCard({
     : getDaysRange(openDays!);
   const style = CARD_STYLES[range];
 
-  // Closed-in-X-days
+  // Closed-in-X-days (only when completedAt is available)
   let closedInDays: number | null = null;
-  if (isClosed) {
+  if (isClosed && occ.completedAt !== null) {
     const s = new Date(occ.createdAt);
-    const e = new Date(occ.completedAt!);
+    const e = new Date(occ.completedAt);
     const sd = new Date(s.getFullYear(), s.getMonth(), s.getDate());
     const ed = new Date(e.getFullYear(), e.getMonth(), e.getDate());
     closedInDays = Math.max(
@@ -388,12 +390,12 @@ export function OccurrencesPipeline({
           occ.items.some((i) => i.damageType.name.toLowerCase().includes(q))
       );
     }
-    if (onlyOpen) result = result.filter((occ) => occ.completedAt === null);
+    if (onlyOpen) result = result.filter((occ) => !occ.status.isFinal);
     if (onlyNoPrice)
       result = result.filter((occ) => occ.items.some((i) => i.unitValue <= 0.01));
     if (daysFilter !== "all") {
       result = result.filter((occ) => {
-        if (occ.completedAt !== null) return false;
+        if (occ.status.isFinal) return false;
         return getDaysRange(daysOpen(occ.createdAt)) === daysFilter;
       });
     }
@@ -413,15 +415,15 @@ export function OccurrencesPipeline({
     // Sort: open by daysOpen DESC (most urgent first), then closed by completedAt DESC
     for (const [, list] of map) {
       list.sort((a, b) => {
-        const aOpen = a.completedAt === null;
-        const bOpen = b.completedAt === null;
+        const aOpen = !a.status.isFinal;
+        const bOpen = !b.status.isFinal;
         if (aOpen && !bOpen) return -1;
         if (!aOpen && bOpen) return 1;
         if (aOpen && bOpen) return daysOpen(b.createdAt) - daysOpen(a.createdAt);
-        return (
-          new Date(b.completedAt!).getTime() -
-          new Date(a.completedAt!).getTime()
-        );
+        // Both closed: sort by completedAt desc, then updatedAt fallback
+        const bTime = b.completedAt ? new Date(b.completedAt).getTime() : 0;
+        const aTime = a.completedAt ? new Date(a.completedAt).getTime() : 0;
+        return bTime - aTime;
       });
     }
     return map;
@@ -430,8 +432,8 @@ export function OccurrencesPipeline({
   // ── Metrics ─────────────────────────────────────────────────────────────────
 
   const metrics = useMemo(() => {
-    const open = filtered.filter((o) => o.completedAt === null);
-    const closed = filtered.filter((o) => o.completedAt !== null);
+    const open = filtered.filter((o) => !o.status.isFinal);
+    const closed = filtered.filter((o) => o.status.isFinal);
     const totalValue = filtered.reduce(
       (s, o) => s + o.items.reduce((is, i) => is + i.totalValue, 0),
       0

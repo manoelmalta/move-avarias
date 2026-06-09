@@ -67,8 +67,7 @@ async function getFullData(
   const destinationMap = new Map<string, number>();
 
   for (const occ of occurrences) {
-    const isOpen = occ.completedAt === null;
-    if (isOpen) openCount++; else closedCount++;
+    if (occ.status.isFinal) closedCount++; else openCount++;
 
     const destName = occ.destination?.name ?? "Sem destinação";
     destinationMap.set(destName, (destinationMap.get(destName) ?? 0) + 1);
@@ -85,7 +84,7 @@ async function getFullData(
   }
 
   const openOccurrences = occurrences
-    .filter((o) => o.completedAt === null)
+    .filter((o) => !o.status.isFinal)
     .slice(0, 10)
     .map((o) => ({
       id: o.id,
@@ -99,8 +98,13 @@ async function getFullData(
     }));
 
   const recentClosedOccurrences = occurrences
-    .filter((o) => o.completedAt !== null)
-    .sort((a, b) => b.completedAt!.getTime() - a.completedAt!.getTime())
+    .filter((o) => o.status.isFinal)
+    .sort((a, b) => {
+      // Sort by completedAt desc; fall back to updatedAt for legacy records without it
+      const bTime = (b.completedAt ?? b.updatedAt).getTime();
+      const aTime = (a.completedAt ?? a.updatedAt).getTime();
+      return bTime - aTime;
+    })
     .slice(0, 10)
     .map((o) => ({
       id: o.id,
@@ -109,7 +113,7 @@ async function getFullData(
       origin: { name: o.origin.name },
       destination: o.destination ? { name: o.destination.name } : null,
       createdAt: o.createdAt.toISOString(),
-      completedAt: o.completedAt!.toISOString(),
+      completedAt: o.completedAt?.toISOString() ?? null,
       quantity: o.items.reduce((s, i) => s + i.quantity, 0),
       totalValue: o.items.reduce((s, i) => s + i.totalValue, 0),
     }));

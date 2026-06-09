@@ -46,7 +46,7 @@ interface OccurrenceCard {
 }
 
 interface ClosedOccurrenceCard extends OccurrenceCard {
-  completedAt: string;
+  completedAt: string | null;
 }
 
 interface SingleResult {
@@ -524,8 +524,8 @@ function OccurrenceCardView({
               <span>Origem: {occ.origin.name}</span>
               {occ.destination && <span>Destino: {occ.destination.name}</span>}
               <span>Abertura: {formatDateTime(new Date(occ.createdAt))}</span>
-              {type === "closed" && "completedAt" in occ && (
-                <span>Encerramento: {formatDateTime(new Date(occ.completedAt))}</span>
+              {type === "closed" && "completedAt" in occ && occ.completedAt && (
+                <span>Encerramento: {formatDateTime(occ.completedAt)}</span>
               )}
             </div>
           </div>
