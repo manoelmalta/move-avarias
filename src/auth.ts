@@ -9,6 +9,7 @@ declare module "next-auth" {
     id: string;
     clientId: string;
     role: UserRole;
+    permissionOverrides: Record<string, boolean>;
   }
   interface Session {
     user: {
@@ -17,6 +18,7 @@ declare module "next-auth" {
       name: string;
       email: string;
       role: UserRole;
+      permissionOverrides: Record<string, boolean>;
     };
   }
 }
@@ -25,6 +27,7 @@ declare module "@auth/core/jwt" {
   interface JWT {
     clientId: string;
     role: UserRole;
+    permissionOverrides: Record<string, boolean>;
   }
 }
 
@@ -41,12 +44,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const email = String(credentials.email).trim().toLowerCase();
         const password = String(credentials.password);
 
-        const user = await prisma.user.findFirst({ where: { email } });
+        const user = await prisma.user.findFirst({
+          where: { email },
+          include: { permissionOverrides: { select: { permission: true, granted: true } } },
+        });
 
         if (!user || !user.active || !user.passwordHash) return null;
 
         const valid = await bcrypt.compare(password, user.passwordHash);
         if (!valid) return null;
+
+        const permissionOverrides = Object.fromEntries(
+          user.permissionOverrides.map((o) => [o.permission, o.granted])
+        );
 
         return {
           id: user.id,
@@ -54,6 +64,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           name: user.name,
           email: user.email,
           role: user.role as UserRole,
+          permissionOverrides,
         };
       },
     }),
@@ -68,6 +79,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.role = user.role as UserRole;
         token.name = user.name;
         token.email = user.email;
+        token.permissionOverrides = (user.permissionOverrides ?? {}) as Record<string, boolean>;
       }
       return token;
     },
@@ -77,6 +89,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       session.user.role = (token.role ?? "SEPARADOR") as UserRole;
       session.user.name = (token.name ?? "") as string;
       session.user.email = (token.email ?? "") as string;
+      session.user.permissionOverrides = (token.permissionOverrides ?? {}) as Record<string, boolean>;
       return session;
     },
   },

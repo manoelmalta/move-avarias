@@ -6,4 +6,5 @@ export interface SessionUser {
   name: string;
   email: string;
   role: UserRole;
+  permissionOverrides: Record<string, boolean>;
 }
