@@ -25,6 +25,7 @@ model Client {
   parameterDestinations ParameterDestination[]
   auditLogs           AuditLog[]
   monthlyBillings     MonthlyBilling[]
+  userPermissionOverrides UserPermissionOverride[]
 }
 
 model User {
@@ -38,11 +39,29 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  client      Client             @relation(fields: [clientId], references: [id])
-  occurrences DamageOccurrence[]
-  auditLogs   AuditLog[]
+  client              Client                   @relation(fields: [clientId], references: [id])
+  occurrences         DamageOccurrence[]
+  auditLogs           AuditLog[]
+  permissionOverrides UserPermissionOverride[]
 
   @@unique([clientId, email])
+}
+
+model UserPermissionOverride {
+  id         String   @id @default(cuid())
+  clientId   String
+  userId     String
+  permission String
+  granted    Boolean
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  client Client @relation(fields: [clientId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([userId, permission])
+  @@index([clientId])
+  @@index([userId])
 }
 
 model Product {
