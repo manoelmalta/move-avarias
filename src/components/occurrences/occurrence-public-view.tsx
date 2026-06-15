@@ -62,9 +62,9 @@ export function OccurrencePublicView({ occurrence, qrSvg, publicUrl }: Props) {
             </p>
           </div>
 
-          {/* Code + QR row */}
-          <div className="flex items-start gap-4 p-4 print:p-3 border-b border-gray-300">
-            <div className="flex-1">
+          {/* Code + QR row — stacks on mobile, side-by-side on sm+ and print */}
+          <div className="flex flex-col sm:flex-row print:flex-row items-center sm:items-start print:items-start gap-4 p-4 print:p-3 border-b border-gray-300 break-inside-avoid">
+            <div className="flex-1 min-w-0 w-full sm:w-auto text-center sm:text-left print:text-left">
               <p className="text-3xl print:text-2xl font-black font-mono tracking-wider text-black leading-tight">
                 {occ.occurrenceCode}
               </p>
@@ -75,13 +75,13 @@ export function OccurrencePublicView({ occurrence, qrSvg, publicUrl }: Props) {
               </div>
             </div>
 
-            {/* QR Code — inline SVG for crisp print quality */}
-            <div className="shrink-0 flex flex-col items-center gap-1">
+            {/* QR Code — fixed-size container forces SVG to scale via CSS */}
+            <div className="shrink-0 flex flex-col items-center gap-1.5">
               <div
-                className="w-28 h-28 print:w-24 print:h-24"
+                className="qr-container w-36 h-36 print:w-28 print:h-28 bg-white border border-gray-200 rounded-sm overflow-hidden p-2"
                 dangerouslySetInnerHTML={{ __html: qrSvg }}
               />
-              <p className="text-[9px] text-gray-500 text-center leading-tight max-w-[7rem]">
+              <p className="text-[9px] text-gray-500 text-center leading-tight">
                 Escaneie para consulta
               </p>
             </div>
@@ -149,11 +149,18 @@ export function OccurrencePublicView({ occurrence, qrSvg, publicUrl }: Props) {
         </div>
       </div>
 
-      {/* Print-specific global styles */}
+      {/* Global styles: print layout + SVG scaling fix */}
       <style>{`
         @media print {
           @page { margin: 10mm; size: A4; }
           body { background: white !important; }
+        }
+        /* Force the inline QR SVG (which ships with fixed width/height attrs)
+           to fill its container. The viewBox ensures correct scaling. */
+        .qr-container svg {
+          width: 100%;
+          height: 100%;
+          display: block;
         }
       `}</style>
     </>
