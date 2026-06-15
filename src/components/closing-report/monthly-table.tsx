@@ -1,12 +1,16 @@
 "use client";
+import { useState } from "react";
 import type { YearlyMonthData } from "@/lib/closing-report/types";
 import { safePct } from "@/lib/closing-report/metrics";
 import { fmtCurrency } from "@/lib/dashboard/chart-utils";
+
+type SaveStatus = "idle" | "saving" | "saved" | "error";
 
 interface MonthlyTableProps {
   yearlyData: YearlyMonthData[];
   billingByMonth: Record<string, string>;
   onBillingChange: (updated: Record<string, string>) => void;
+  onSaveBilling: (month: string, value: string) => Promise<"ok" | "error">;
 }
 
 // ── Style tokens ───────────────────────────────────────────────────────────────
@@ -93,11 +97,49 @@ const totalPctCellStyle: React.CSSProperties = {
   fontWeight: 700,
 };
 
+// ── Save status label ──────────────────────────────────────────────────────────
+
+function SaveStatusLabel({ status }: { status: SaveStatus }) {
+  if (status === "idle") return null;
+  const map: Record<Exclude<SaveStatus, "idle">, { text: string; color: string }> = {
+    saving: { text: "Salvando…", color: "#6B756F" },
+    saved: { text: "Salvo ✓", color: "#0D6F65" },
+    error: { text: "Erro ao salvar", color: "#B91C1C" },
+  };
+  const { text, color } = map[status as Exclude<SaveStatus, "idle">];
+  return (
+    <span style={{ fontSize: 10, color, fontWeight: 500, marginLeft: 4, whiteSpace: "nowrap" }}>
+      {text}
+    </span>
+  );
+}
+
 // ── Component ──────────────────────────────────────────────────────────────────
 
-export function MonthlyTable({ yearlyData, billingByMonth, onBillingChange }: MonthlyTableProps) {
+export function MonthlyTable({
+  yearlyData,
+  billingByMonth,
+  onBillingChange,
+  onSaveBilling,
+}: MonthlyTableProps) {
+  const [saveStatus, setSaveStatus] = useState<Record<string, SaveStatus>>({});
+
   const handleBillingInput = (month: string, value: string) => {
     onBillingChange({ ...billingByMonth, [month]: value });
+    // Reset status on change so feedback clears
+    setSaveStatus((prev) => ({ ...prev, [month]: "idle" }));
+  };
+
+  const handleBillingBlur = async (month: string, value: string) => {
+    setSaveStatus((prev) => ({ ...prev, [month]: "saving" }));
+    const result = await onSaveBilling(month, value);
+    setSaveStatus((prev) => ({ ...prev, [month]: result === "ok" ? "saved" : "error" }));
+    if (result === "ok") {
+      // Clear "Salvo" feedback after 2 s
+      setTimeout(() => {
+        setSaveStatus((prev) => (prev[month] === "saved" ? { ...prev, [month]: "idle" } : prev));
+      }, 2000);
+    }
   };
 
   const getBilling = (month: string): number => {
@@ -140,8 +182,8 @@ export function MonthlyTable({ yearlyData, billingByMonth, onBillingChange }: Mo
         </h3>
         <p className="text-[11px] mt-0.5" style={{ color: "#6B756F" }}>
           Preencha o campo <strong>R$ Faturado</strong> para calcular as participações percentuais.{" "}
-          <span style={{ color: "#B45309" }}>
-            Os valores inseridos não são salvos ao recarregar a página.
+          <span style={{ color: "#0D6F65" }}>
+            Os valores de faturamento são gravados e utilizados na apuração dos KPIs mensais.
           </span>
         </p>
       </div>
@@ -195,7 +237,7 @@ export function MonthlyTable({ yearlyData, billingByMonth, onBillingChange }: Mo
               <td style={totalValueCellStyle}>{fmtCurrency(totalClosed)}</td>
             </tr>
 
-            {/* Row 3 — R$ Faturado no Mês (editable) */}
+            {/* Row 3 — R$ Faturado no Mês (editable, persisted) */}
             <tr>
               <td
                 style={{
@@ -215,35 +257,39 @@ export function MonthlyTable({ yearlyData, billingByMonth, onBillingChange }: Mo
                     borderBottom: "2px solid #DDE7DE",
                   }}
                 >
-                  <div className="flex items-center justify-end gap-1">
-                    <span style={{ fontSize: 10, color: "#9AA59F" }}>R$</span>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={billingByMonth[d.month] ?? ""}
-                      onChange={(e) => handleBillingInput(d.month, e.target.value)}
-                      placeholder="0,00"
-                      style={{
-                        width: 72,
-                        background: "#F7FAF8",
-                        border: "1px solid #DDE7DE",
-                        borderRadius: 4,
-                        padding: "3px 6px",
-                        fontSize: 12,
-                        color: "#1C2A24",
-                        textAlign: "right",
-                        outline: "none",
-                        fontVariantNumeric: "tabular-nums",
-                      }}
-                      onFocus={(e) => {
-                        (e.target as HTMLInputElement).style.borderColor = "#0D6F65";
-                        (e.target as HTMLInputElement).style.background = "#FFFFFF";
-                      }}
-                      onBlur={(e) => {
-                        (e.target as HTMLInputElement).style.borderColor = "#DDE7DE";
-                        (e.target as HTMLInputElement).style.background = "#F7FAF8";
-                      }}
-                    />
+                  <div className="flex flex-col items-end gap-0.5">
+                    <div className="flex items-center justify-end gap-1">
+                      <span style={{ fontSize: 10, color: "#9AA59F" }}>R$</span>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={billingByMonth[d.month] ?? ""}
+                        onChange={(e) => handleBillingInput(d.month, e.target.value)}
+                        onBlur={(e) => {
+                          (e.target as HTMLInputElement).style.borderColor = "#DDE7DE";
+                          (e.target as HTMLInputElement).style.background = "#F7FAF8";
+                          handleBillingBlur(d.month, (e.target as HTMLInputElement).value);
+                        }}
+                        placeholder="0,00"
+                        style={{
+                          width: 72,
+                          background: "#F7FAF8",
+                          border: "1px solid #DDE7DE",
+                          borderRadius: 4,
+                          padding: "3px 6px",
+                          fontSize: 12,
+                          color: "#1C2A24",
+                          textAlign: "right",
+                          outline: "none",
+                          fontVariantNumeric: "tabular-nums",
+                        }}
+                        onFocus={(e) => {
+                          (e.target as HTMLInputElement).style.borderColor = "#0D6F65";
+                          (e.target as HTMLInputElement).style.background = "#FFFFFF";
+                        }}
+                      />
+                    </div>
+                    <SaveStatusLabel status={saveStatus[d.month] ?? "idle"} />
                   </div>
                 </td>
               ))}

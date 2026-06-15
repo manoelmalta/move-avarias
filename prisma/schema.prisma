@@ -24,6 +24,7 @@ model Client {
   parameterStatuses   ParameterStatus[]
   parameterDestinations ParameterDestination[]
   auditLogs           AuditLog[]
+  monthlyBillings     MonthlyBilling[]
 }
 
 model User {
@@ -179,6 +180,20 @@ model ParameterDestination {
 
   client      Client             @relation(fields: [clientId], references: [id])
   occurrences DamageOccurrence[]
+}
+
+model MonthlyBilling {
+  id        String   @id @default(cuid())
+  clientId  String
+  year      Int
+  month     Int
+  amount    Decimal  @db.Decimal(14, 2)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  client Client @relation(fields: [clientId], references: [id])
+
+  @@unique([clientId, year, month])
 }
 
 model AuditLog {

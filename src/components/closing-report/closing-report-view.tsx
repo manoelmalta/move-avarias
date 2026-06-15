@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo, useCallback, createElement } from "react";
+import { useState, useMemo, useCallback, useEffect, createElement } from "react";
 import { FileText, Download, Sheet, AlertTriangle, CalendarDays, SlidersHorizontal } from "lucide-react";
 import type { ClosingReportOccurrence, ClosingReportParam } from "@/lib/closing-report/types";
 import { EMPTY_CLOSING_FILTERS } from "@/lib/closing-report/types";
@@ -58,7 +58,7 @@ export function ClosingReportView({
   // ── Gerencial filter (year) ──────────────────────────────────────────────────
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
 
-  // ── Billing (local, per month) ───────────────────────────────────────────────
+  // ── Billing — persisted in DB, keyed by "YYYY-MM" ───────────────────────────
   const [billingByMonth, setBillingByMonth] = useState<Record<string, string>>({});
 
   // ── Detail filter (items table) ──────────────────────────────────────────────
@@ -99,6 +99,58 @@ export function ClosingReportView({
   const totalClosedValue = useMemo(
     () => yearlyData.reduce((s, d) => s + d.closedValue, 0),
     [yearlyData]
+  );
+
+  // ── Load billing from API whenever year changes ──────────────────────────────
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/closing-report/monthly-billing?year=${selectedYear}`)
+      .then((r) => r.json())
+      .then((data: { year: number; items: { month: number; amount: string }[] }) => {
+        if (cancelled) return;
+        const map: Record<string, string> = {};
+        for (const item of data.items) {
+          const key = `${selectedYear}-${String(item.month).padStart(2, "0")}`;
+          const num = parseFloat(item.amount);
+          if (num > 0) {
+            map[key] = num.toLocaleString("pt-BR", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            });
+          }
+        }
+        setBillingByMonth(map);
+      })
+      .catch(() => {
+        if (!cancelled) setBillingByMonth({});
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedYear]);
+
+  // ── Save a single month's billing to the API ─────────────────────────────────
+  const handleSaveBilling = useCallback(
+    async (month: string, rawValue: string): Promise<"ok" | "error"> => {
+      const normalized = rawValue.replace(/\./g, "").replace(",", ".");
+      const amount = parseFloat(normalized) || 0;
+      const [yearStr, monthStr] = month.split("-");
+      try {
+        const res = await fetch("/api/closing-report/monthly-billing", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            year: parseInt(yearStr, 10),
+            month: parseInt(monthStr, 10),
+            amount,
+          }),
+        });
+        return res.ok ? "ok" : "error";
+      } catch {
+        return "error";
+      }
+    },
+    []
   );
 
   // ── Detail: filtered occurrences → product groups ───────────────────────────
@@ -463,6 +515,7 @@ export function ClosingReportView({
         yearlyData={yearlyData}
         billingByMonth={billingByMonth}
         onBillingChange={setBillingByMonth}
+        onSaveBilling={handleSaveBilling}
       />
 
       {/* ── Alert Banner ────────────────────────────────────────────────────── */}
