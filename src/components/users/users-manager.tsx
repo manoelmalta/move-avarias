@@ -1,17 +1,21 @@
 "use client";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Separator } from "@/components/ui/separator";
 import { formatDateTime } from "@/lib/utils";
-import { Plus, Pencil, KeyRound, Loader2, UserCheck, UserX, ShieldCheck } from "lucide-react";
+import { Plus, Pencil, KeyRound, Loader2, UserCheck, UserX, ShieldCheck, ShieldAlert, RotateCcw } from "lucide-react";
 import type { UserRole } from "@/lib/auth/types";
+import type { Permission } from "@/lib/permissions";
+import { PERMISSION_MODULES, PERMISSION_LABELS, ROLE_PERMISSIONS } from "@/lib/permissions";
 import { isProtectedAdmin } from "@/lib/protected-users";
 
 interface User {
@@ -24,7 +28,14 @@ interface User {
   updatedAt: Date | string;
 }
 
-type DialogMode = "none" | "create" | "edit" | "reset-password";
+interface PermissionEntry {
+  permission: string;
+  roleDefault: boolean;
+  overrideValue: boolean | null;
+  effective: boolean;
+}
+
+type DialogMode = "none" | "create" | "edit" | "reset-password" | "permissions";
 
 const ROLES: UserRole[] = ["SEPARADOR", "LIDER", "ANALISTA", "GESTOR", "ADMIN"];
 
@@ -66,6 +77,12 @@ export function UsersManager({ users: initial, currentUserId }: { users: User[];
   const [editForm, setEditForm] = useState({ name: "", email: "", role: "" as UserRole | "", active: true });
   const [resetForm, setResetForm] = useState({ password: "", confirm: "" });
 
+  // Permissions panel state
+  const [permEntries, setPermEntries] = useState<PermissionEntry[]>([]);
+  const [permLoading, setPermLoading] = useState(false);
+  const [permOverrides, setPermOverrides] = useState<Record<string, boolean>>({});
+  const [permRole, setPermRole] = useState<UserRole>("SEPARADOR");
+
   const openCreate = () => {
     setCreateForm({ name: "", email: "", role: "", password: "", confirm: "" });
     setError(""); setSuccess("");
@@ -85,6 +102,34 @@ export function UsersManager({ users: initial, currentUserId }: { users: User[];
     setError(""); setSuccess("");
     setDialogMode("reset-password");
   };
+
+  const openPermissions = useCallback(async (u: User) => {
+    setSelected(u);
+    setError(""); setSuccess("");
+    setPermLoading(true);
+    setPermEntries([]);
+    setDialogMode("permissions");
+
+    try {
+      const res = await fetch(`/api/users/${u.id}/permissions`);
+      const json = await res.json() as { role: UserRole; permissions: PermissionEntry[] };
+      if (res.ok) {
+        setPermRole(json.role);
+        setPermEntries(json.permissions);
+        const overrides: Record<string, boolean> = {};
+        for (const e of json.permissions) {
+          if (e.overrideValue !== null) overrides[e.permission] = e.overrideValue;
+        }
+        setPermOverrides(overrides);
+      } else {
+        setError("Erro ao carregar permissões.");
+      }
+    } catch {
+      setError("Erro de rede ao carregar permissões.");
+    } finally {
+      setPermLoading(false);
+    }
+  }, []);
 
   const closeDialog = () => { setDialogMode("none"); setSelected(null); setError(""); setSuccess(""); };
 
@@ -189,6 +234,53 @@ export function UsersManager({ users: initial, currentUserId }: { users: User[];
     finally { setSaving(false); }
   };
 
+  const togglePermission = (perm: Permission) => {
+    setPermOverrides((prev) => {
+      const roleDefault = ROLE_PERMISSIONS[permRole]?.includes(perm) ?? false;
+      const currentEffective = perm in prev ? prev[perm] : roleDefault;
+      const next = !currentEffective;
+
+      if (next === roleDefault) {
+        const copy = { ...prev };
+        delete copy[perm];
+        return copy;
+      }
+      return { ...prev, [perm]: next };
+    });
+  };
+
+  const handleResetPermissions = async () => {
+    if (!selected) return;
+    setSaving(true); setError("");
+    try {
+      const res = await fetch(`/api/users/${selected.id}/permissions`, { method: "DELETE" });
+      if (!res.ok) { setError("Erro ao restaurar permissões."); return; }
+      setPermOverrides({});
+      setPermEntries((prev) =>
+        prev.map((e) => ({ ...e, overrideValue: null, effective: e.roleDefault }))
+      );
+      setSuccess("Permissões restauradas ao padrão do perfil.");
+    } catch { setError("Erro de rede. Tente novamente."); }
+    finally { setSaving(false); }
+  };
+
+  const handleSavePermissions = async () => {
+    if (!selected) return;
+    setSaving(true); setError(""); setSuccess("");
+    try {
+      const res = await fetch(`/api/users/${selected.id}/permissions`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ overrides: permOverrides }),
+      });
+      if (!res.ok) { setError("Erro ao salvar permissões."); return; }
+      setSuccess("Permissões salvas. O usuário precisará fazer login novamente para aplicar as mudanças.");
+    } catch { setError("Erro de rede. Tente novamente."); }
+    finally { setSaving(false); }
+  };
+
+  const hasCustomizations = Object.keys(permOverrides).length > 0;
+
   return (
     <>
       <div className="flex items-center justify-between">
@@ -262,6 +354,22 @@ export function UsersManager({ users: initial, currentUserId }: { users: User[];
                           title={isProtected ? "Administrador protegido do sistema." : "Editar"}
                         >
                           <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-10 w-10 p-0"
+                          onClick={() => void openPermissions(u)}
+                          disabled={u.id === currentUserId || isProtected}
+                          title={
+                            u.id === currentUserId
+                              ? "Não é permitido editar as próprias permissões."
+                              : isProtected
+                                ? "Administrador protegido do sistema."
+                                : "Gerenciar permissões"
+                          }
+                        >
+                          <ShieldAlert className="h-4 w-4" />
                         </Button>
                         <Button
                           size="sm"
@@ -417,6 +525,118 @@ export function UsersManager({ users: initial, currentUserId }: { users: User[];
               </>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Permissões */}
+      <Dialog open={dialogMode === "permissions"} onOpenChange={(o) => { if (!o) closeDialog(); }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldAlert className="h-5 w-5" />
+              Permissões{selected ? ` — ${selected.name}` : ""}
+            </DialogTitle>
+          </DialogHeader>
+
+          {permLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded-md px-3 py-2">
+                <span>Perfil base:</span>
+                <Badge variant={roleVariants[permRole] ?? "secondary"}>
+                  {roleLabels[permRole] ?? permRole}
+                </Badge>
+                {hasCustomizations && (
+                  <span className="ml-auto text-amber-600 font-medium text-xs flex items-center gap-1">
+                    <ShieldAlert className="h-3 w-3" />
+                    {Object.keys(permOverrides).length} permissão(ões) personalizada(s)
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2 text-xs text-muted-foreground px-1">
+                <span className="flex items-center gap-1">
+                  <span className="inline-block w-2.5 h-2.5 rounded-sm border-2 border-amber-400 bg-amber-50" />
+                  Personalizada
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="inline-block w-2.5 h-2.5 rounded-sm border-2 border-border" />
+                  Padrão do perfil
+                </span>
+              </div>
+
+              {PERMISSION_MODULES.map((module, mi) => {
+                const modulePerms = module.permissions.map((perm) => {
+                  const entry = permEntries.find((e) => e.permission === perm);
+                  const roleDefault = ROLE_PERMISSIONS[permRole]?.includes(perm) ?? false;
+                  const isOverridden = perm in permOverrides;
+                  const effective = isOverridden ? permOverrides[perm] : (entry?.effective ?? roleDefault);
+                  return { perm, roleDefault, isOverridden, effective };
+                });
+
+                return (
+                  <div key={module.label}>
+                    {mi > 0 && <Separator className="my-3" />}
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+                      {module.label}
+                    </p>
+                    <div className="space-y-1">
+                      {modulePerms.map(({ perm, roleDefault, isOverridden, effective }) => (
+                        <label
+                          key={perm}
+                          className={`flex items-center gap-3 px-2 py-1.5 rounded-md cursor-pointer hover:bg-muted/50 transition-colors ${
+                            isOverridden ? "border border-amber-300 bg-amber-50/50" : ""
+                          }`}
+                        >
+                          <Checkbox
+                            checked={effective}
+                            onCheckedChange={() => togglePermission(perm as Permission)}
+                          />
+                          <span className="text-sm flex-1">
+                            {PERMISSION_LABELS[perm as Permission] ?? perm}
+                          </span>
+                          {isOverridden && (
+                            <span className="text-xs text-amber-700 shrink-0">
+                              {roleDefault ? "removida do perfil" : "adicionada ao perfil"}
+                            </span>
+                          )}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {success && (
+                <p className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-md px-3 py-2">
+                  {success}
+                </p>
+              )}
+              {error && <p className="text-sm text-destructive">{error}</p>}
+
+              <div className="flex items-center gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void handleResetPermissions()}
+                  disabled={saving || !hasCustomizations}
+                  title="Restaurar padrão do perfil"
+                >
+                  <RotateCcw className="h-3.5 w-3.5 mr-1" />
+                  Restaurar padrão
+                </Button>
+                <div className="flex-1" />
+                <Button variant="outline" onClick={closeDialog} disabled={saving}>Fechar</Button>
+                <Button onClick={() => void handleSavePermissions()} disabled={saving}>
+                  {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+                  Salvar permissões
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </>

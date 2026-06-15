@@ -60,7 +60,7 @@ export function Sidebar({ onMobileClose }: SidebarProps = {}) {
         ...(hasPermission(user, "parameter:manage")
           ? [{ href: "/parameters", label: "Parâmetros", icon: Settings }]
           : []),
-        ...(hasPermission(user, "user:manage")
+        ...(user.role === "ADMIN"
           ? [{ href: "/users", label: "Usuários", icon: Users }]
           : []),
       ]
