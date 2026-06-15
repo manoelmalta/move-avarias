@@ -104,6 +104,7 @@ model DamageOccurrence {
   id                     String    @id @default(cuid())
   clientId               String
   occurrenceCode         String    @unique
+  publicToken            String    @unique @default(cuid())
   openedByUserId         String
   originId               String
   statusId               String

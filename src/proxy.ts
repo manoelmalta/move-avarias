@@ -9,6 +9,10 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
+  if (pathname.startsWith("/public/")) {
+    return NextResponse.next();
+  }
+
   const session = await auth();
   const isLoggedIn = !!session?.user;
 
