@@ -112,7 +112,7 @@ export function ClosingReportView({
         for (const item of data.items) {
           const key = `${selectedYear}-${String(item.month).padStart(2, "0")}`;
           const num = parseFloat(item.amount);
-          if (num > 0) {
+          if (!isNaN(num)) {
             map[key] = num.toLocaleString("pt-BR", {
               minimumFractionDigits: 2,
               maximumFractionDigits: 2,
@@ -130,11 +130,36 @@ export function ClosingReportView({
   }, [selectedYear]);
 
   // ── Save a single month's billing to the API ─────────────────────────────────
+  // Empty rawValue → DELETE the record (field cleared = "não informado").
+  // Any non-empty value, including "0", → PUT (explicit zero is a valid KPI input).
   const handleSaveBilling = useCallback(
     async (month: string, rawValue: string): Promise<"ok" | "error"> => {
-      const normalized = rawValue.replace(/\./g, "").replace(",", ".");
-      const amount = parseFloat(normalized) || 0;
       const [yearStr, monthStr] = month.split("-");
+
+      if (rawValue.trim() === "") {
+        try {
+          const res = await fetch(
+            `/api/closing-report/monthly-billing?year=${yearStr}&month=${monthStr}`,
+            { method: "DELETE" }
+          );
+          if (res.ok) {
+            setBillingByMonth((prev) => {
+              const next = { ...prev };
+              delete next[month];
+              return next;
+            });
+            return "ok";
+          }
+          return "error";
+        } catch {
+          return "error";
+        }
+      }
+
+      const normalized = rawValue.replace(/\./g, "").replace(",", ".");
+      const amount = parseFloat(normalized);
+      if (isNaN(amount) || amount < 0) return "error";
+
       try {
         const res = await fetch("/api/closing-report/monthly-billing", {
           method: "PUT",
@@ -150,7 +175,7 @@ export function ClosingReportView({
         return "error";
       }
     },
-    []
+    [setBillingByMonth]
   );
 
   // ── Detail: filtered occurrences → product groups ───────────────────────────

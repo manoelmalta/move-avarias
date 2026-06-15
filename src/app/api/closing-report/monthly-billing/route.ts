@@ -86,3 +86,30 @@ export async function PUT(req: NextRequest) {
 
   return NextResponse.json({ month: record.month, amount: record.amount.toFixed(2) });
 }
+
+export async function DELETE(req: NextRequest) {
+  const session = await auth();
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!hasPermission(session.user, "dashboard:indicators")) {
+    return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
+  }
+
+  const { clientId } = session.user;
+  const yearParam = req.nextUrl.searchParams.get("year");
+  const monthParam = req.nextUrl.searchParams.get("month");
+
+  const year = yearParam ? parseInt(yearParam, 10) : NaN;
+  const month = monthParam ? parseInt(monthParam, 10) : NaN;
+
+  if (!Number.isInteger(year) || year < 2000 || year > 2100) {
+    return NextResponse.json({ error: "Ano inválido" }, { status: 400 });
+  }
+  if (!Number.isInteger(month) || month < 1 || month > 12) {
+    return NextResponse.json({ error: "Mês inválido (1–12)" }, { status: 400 });
+  }
+
+  // deleteMany is a no-op when the record doesn't exist — safe to call unconditionally
+  await prisma.monthlyBilling.deleteMany({ where: { clientId, year, month } });
+
+  return NextResponse.json({ ok: true });
+}
