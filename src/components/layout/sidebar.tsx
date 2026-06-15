@@ -13,6 +13,7 @@ import {
   Users,
   X,
   FileBarChart2,
+  QrCode,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSession } from "@/lib/auth/session-context";
@@ -44,6 +45,9 @@ export function Sidebar({ onMobileClose }: SidebarProps = {}) {
           : []),
         ...(hasPermission(user, "occurrence:view_all") || hasPermission(user, "occurrence:view_own")
           ? [{ href: "/occurrences/pipeline", label: "Pipeline", icon: Kanban }]
+          : []),
+        ...(hasPermission(user, "occurrence:view_all") || hasPermission(user, "occurrence:view_own")
+          ? [{ href: "/occurrences/scan", label: "Escanear Ocorrência", icon: QrCode }]
           : []),
         ...(hasPermission(user, "occurrence:create")
           ? [{ href: "/occurrences/new", label: "Nova Ocorrência", icon: PackagePlus }]
@@ -125,6 +129,7 @@ export function Sidebar({ onMobileClose }: SidebarProps = {}) {
               "/closing-report",
               "/occurrences/new",
               "/occurrences/pipeline",
+              "/occurrences/scan",
               "/products",
               "/products/lookup",
             ]);
