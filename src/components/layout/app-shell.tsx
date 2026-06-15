@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { usePathname } from "next/navigation";
 import { Menu } from "lucide-react";
 import { Sidebar } from "./sidebar";
 
@@ -15,8 +16,14 @@ interface AppShellProps {
  * On mobile (< md) the sidebar is hidden and slides in as an overlay when the hamburger is pressed.
  */
 export function AppShell({ children, header }: AppShellProps) {
+  const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const closeMobile = () => setMobileOpen(false);
+
+  // Public routes render without shell (no sidebar, no header)
+  if (pathname.startsWith("/public")) {
+    return <>{children}</>;
+  }
 
   return (
     <div className="flex h-full">

@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
-import { CheckCircle, Loader2, AlertTriangle, Trash2, Plus, Pencil, X, Check } from "lucide-react";
+import { CheckCircle, Loader2, AlertTriangle, Trash2, Plus, Pencil, X, Check, Printer } from "lucide-react";
 
 interface Status { id: string; name: string; isFinal: boolean }
 interface Destination { id: string; name: string; description: string | null; requiresStorageLocation: boolean }
@@ -42,6 +42,7 @@ interface OccurrenceItem {
 interface Occurrence {
   id: string;
   occurrenceCode: string;
+  publicToken: string;
   description: string;
   destinationObservation: string | null;
   storageLocation: string | null;
@@ -330,6 +331,14 @@ export function OccurrenceDetail({
           <p className="text-muted-foreground text-sm">Aberta por {occ.openedBy.name} em {formatDateTime(occ.createdAt)}</p>
         </div>
         <div className="flex gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => window.open(`/public/occurrence/${occ.publicToken}`, "_blank")}
+          >
+            <Printer className="h-4 w-4 mr-1" />
+            Imprimir Etiqueta
+          </Button>
           {canDeleteOccurrence && !isCompleted && !showDeleteConfirm && (
             <Button variant="destructive" size="sm" onClick={() => setShowDeleteConfirm(true)}>
               <Trash2 className="h-4 w-4 mr-1" />
