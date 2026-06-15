@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Camera, CameraOff, Search, Loader2, QrCode } from "lucide-react";
 
-type ScanState = "idle" | "scanning" | "resolving" | "error";
+type ScanState = "idle" | "starting" | "scanning" | "resolving" | "error";
 
 async function resolveOccurrence(
   params: { publicToken?: string; occurrenceCode?: string }
@@ -23,10 +23,27 @@ async function resolveOccurrence(
   }
 }
 
+function getCameraErrorMessage(err: unknown): string {
+  const name = err instanceof Error ? err.name : "";
+  if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+    return "Permissão da câmera negada. Libere o acesso à câmera no navegador ou use a busca por código.";
+  }
+  if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+    return "Não foi possível acessar a câmera. Use a busca por código.";
+  }
+  if (name === "NotReadableError" || name === "TrackStartError") {
+    return "Câmera em uso por outro aplicativo. Feche-o e tente novamente.";
+  }
+  return "Não foi possível iniciar a câmera. Tente novamente ou digite o código da ocorrência.";
+}
+
 export function OccurrenceScanner() {
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);
   const controlsRef = useRef<IScannerControls | null>(null);
+  // streamRef holds the raw MediaStream so we can stop all tracks on cleanup,
+  // which is required on iOS to fully release the camera indicator.
+  const streamRef = useRef<MediaStream | null>(null);
   const scanningRef = useRef(false);
 
   const [state, setState] = useState<ScanState>("idle");
@@ -36,15 +53,19 @@ export function OccurrenceScanner() {
   const [manualError, setManualError] = useState("");
 
   const stopCamera = useCallback(() => {
+    // Stop @zxing decode loop
     controlsRef.current?.stop();
     controlsRef.current = null;
+    // Stop every track to release the camera on iOS (otherwise the recording
+    // indicator stays active even after the user navigates away)
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
     scanningRef.current = false;
     setState("idle");
   }, []);
 
   const handleQRText = useCallback(
     async (text: string) => {
-      // Accept full URL or relative path: /public/occurrence/TOKEN
       const match = text.match(/\/public\/occurrence\/([^/?#\s]+)/);
       if (!match) {
         setErrorMsg("QR Code não reconhecido como ocorrência do MOVE AVARIAS.");
@@ -52,9 +73,8 @@ export function OccurrenceScanner() {
         stopCamera();
         return;
       }
-      const publicToken = match[1];
       setState("resolving");
-      const result = await resolveOccurrence({ publicToken });
+      const result = await resolveOccurrence({ publicToken: match[1] });
       if ("error" in result) {
         setErrorMsg(result.error);
         setState("error");
@@ -67,51 +87,90 @@ export function OccurrenceScanner() {
 
   const startCamera = useCallback(async () => {
     if (!videoRef.current) return;
-    setState("scanning");
+    // Always clean up any existing session before starting a new one
+    stopCamera();
+    scanningRef.current = false;
+    setState("starting");
     setErrorMsg("");
 
+    // ── Step 1: acquire the MediaStream directly ───────────────────────────
+    // Using getUserMedia gives us:
+    //   a) typed error names for friendly messages (NotAllowedError, etc.)
+    //   b) a handle to stop all tracks on cleanup (critical on iOS)
+    //   c) facingMode: { ideal } falls back to any camera if back cam unavailable
+    let stream: MediaStream;
     try {
-      // Dynamic import keeps @zxing/browser out of the SSR bundle
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" } },
+      });
+    } catch (err) {
+      setErrorMsg(getCameraErrorMessage(err));
+      setState("error");
+      return;
+    }
+
+    streamRef.current = stream;
+
+    // ── Step 2: wire the stream to the video element ───────────────────────
+    // We assign srcObject and call play() ourselves before handing it to @zxing.
+    // This ensures autoPlay / muted / playsInline are honoured by Safari
+    // before the library touches the element.
+    const video = videoRef.current;
+    video.srcObject = stream;
+    try {
+      await video.play();
+    } catch {
+      // play() rejection is non-fatal — @zxing will call play() again internally
+    }
+
+    setState("scanning");
+
+    // ── Step 3: start the decode loop ─────────────────────────────────────
+    try {
       const { BrowserQRCodeReader } = await import("@zxing/browser");
       const reader = new BrowserQRCodeReader();
 
-      controlsRef.current = await reader.decodeFromConstraints(
-        { video: { facingMode: "environment" } },
-        videoRef.current,
+      controlsRef.current = await reader.decodeFromStream(
+        stream,
+        video,
         (result, err) => {
-          // The callback fires continuously; guard against double-processing
           if (result && !scanningRef.current) {
             scanningRef.current = true;
             controlsRef.current?.stop();
             handleQRText(result.getText());
           }
-          // Suppress NotFoundException / ChecksumException (no QR in frame yet)
+          // The callback fires on every frame; NotFoundException means "no QR
+          // visible yet" — suppress it. Only flag genuinely unexpected errors.
           if (
             err &&
             err.name !== "NotFoundException" &&
             err.name !== "ChecksumException" &&
-            err.name !== "FormatException"
+            err.name !== "FormatException" &&
+            !scanningRef.current
           ) {
             setErrorMsg("Câmera com erro. Tente novamente.");
             setState("error");
-            controlsRef.current?.stop();
+            stopCamera();
           }
         }
       );
-    } catch {
-      setErrorMsg(
-        "Não foi possível acessar a câmera. Use a busca manual abaixo."
-      );
+    } catch (err) {
+      setErrorMsg(getCameraErrorMessage(err));
       setState("error");
+      stream.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
     }
-  }, [handleQRText]);
+  }, [handleQRText, stopCamera]);
 
-  // Cleanup on unmount
+  // Release camera and media tracks on unmount
   useEffect(() => {
     return () => {
       controlsRef.current?.stop();
+      streamRef.current?.getTracks().forEach((t) => t.stop());
     };
   }, []);
+
+  const isVideoVisible = state === "starting" || state === "scanning";
 
   const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -132,21 +191,33 @@ export function OccurrenceScanner() {
     <div className="max-w-lg mx-auto space-y-4">
       {/* ── Camera area ────────────────────────────────────────────────── */}
       <div className="bg-card border rounded-lg overflow-hidden">
-        {/* Video feed — kept in DOM so the ref is stable across state changes */}
-        <div className={state === "scanning" ? "relative bg-black aspect-square" : "hidden"}>
+        {/* Video element is always in the DOM so videoRef stays stable.
+            CSS hidden/visible toggled by state — never conditionally rendered. */}
+        <div className={isVideoVisible ? "relative bg-black aspect-square" : "hidden"}>
+          {/* autoPlay: required by Safari; muted + playsInline: prevent
+              fullscreen takeover on iOS */}
           <video
             ref={videoRef}
             className="w-full h-full object-cover"
+            autoPlay
             muted
             playsInline
           />
-          {/* Targeting overlay */}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="w-52 h-52 border-2 border-white/80 rounded-lg shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]" />
-          </div>
-          <p className="absolute bottom-4 left-0 right-0 text-center text-xs text-white/80">
-            Aponte para o QR Code da etiqueta
-          </p>
+          {state === "starting" && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-white/70" />
+            </div>
+          )}
+          {state === "scanning" && (
+            <>
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="w-52 h-52 border-2 border-white/80 rounded-lg shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]" />
+              </div>
+              <p className="absolute bottom-4 left-0 right-0 text-center text-xs text-white/80">
+                Aponte para o QR Code da etiqueta
+              </p>
+            </>
+          )}
         </div>
 
         <div className="p-4 space-y-3">
@@ -160,7 +231,7 @@ export function OccurrenceScanner() {
             </button>
           )}
 
-          {state === "scanning" && (
+          {(state === "starting" || state === "scanning") && (
             <button
               onClick={stopCamera}
               className="w-full flex items-center justify-center gap-2 border border-input px-4 py-2.5 rounded-md text-sm hover:bg-muted transition-colors"
@@ -181,7 +252,7 @@ export function OccurrenceScanner() {
             <div className="space-y-3">
               <p className="text-sm text-destructive text-center">{errorMsg}</p>
               <button
-                onClick={() => { setState("idle"); setErrorMsg(""); }}
+                onClick={startCamera}
                 className="w-full flex items-center justify-center gap-2 border border-input px-4 py-2.5 rounded-md text-sm hover:bg-muted transition-colors"
               >
                 <Camera className="h-4 w-4" />
