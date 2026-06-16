@@ -9,7 +9,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (pathname.startsWith("/public/")) {
+  if (pathname.startsWith("/public/") || pathname.startsWith("/api/public/")) {
     return NextResponse.next();
   }
 
