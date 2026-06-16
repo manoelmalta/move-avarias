@@ -12,7 +12,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
-import { CheckCircle, Loader2, AlertTriangle, Trash2, Plus, Pencil, X, Check, Printer, FileDown } from "lucide-react";
+import { CheckCircle, Loader2, AlertTriangle, Trash2, Plus, Pencil, X, Check } from "lucide-react";
+import { OccurrenceLabelActions } from "@/components/occurrences/occurrence-label-actions";
 
 interface Status { id: string; name: string; isFinal: boolean }
 interface Destination { id: string; name: string; description: string | null; requiresStorageLocation: boolean }
@@ -331,22 +332,7 @@ export function OccurrenceDetail({
           <p className="text-muted-foreground text-sm">Aberta por {occ.openedBy.name} em {formatDateTime(occ.createdAt)}</p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => window.open(`/public/occurrence/${occ.publicToken}`, "_blank")}
-          >
-            <Printer className="h-4 w-4 mr-1" />
-            Imprimir Etiqueta
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => window.open(`/api/public/occurrence/${occ.publicToken}/label-pdf`, "_blank")}
-          >
-            <FileDown className="h-4 w-4 mr-1" />
-            Baixar PDF da Etiqueta
-          </Button>
+          <OccurrenceLabelActions occurrenceCode={occ.occurrenceCode} publicToken={occ.publicToken} />
           {canDeleteOccurrence && !isCompleted && !showDeleteConfirm && (
             <Button variant="destructive" size="sm" onClick={() => setShowDeleteConfirm(true)}>
               <Trash2 className="h-4 w-4 mr-1" />
