@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
-import { CheckCircle, Loader2, AlertTriangle, Trash2, Plus, Pencil, X, Check, Printer } from "lucide-react";
+import { CheckCircle, Loader2, AlertTriangle, Trash2, Plus, Pencil, X, Check, Printer, FileDown } from "lucide-react";
 
 interface Status { id: string; name: string; isFinal: boolean }
 interface Destination { id: string; name: string; description: string | null; requiresStorageLocation: boolean }
@@ -338,6 +338,14 @@ export function OccurrenceDetail({
           >
             <Printer className="h-4 w-4 mr-1" />
             Imprimir Etiqueta
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => window.open(`/api/public/occurrence/${occ.publicToken}/label-pdf`, "_blank")}
+          >
+            <FileDown className="h-4 w-4 mr-1" />
+            Baixar PDF da Etiqueta
           </Button>
           {canDeleteOccurrence && !isCompleted && !showDeleteConfirm && (
             <Button variant="destructive" size="sm" onClick={() => setShowDeleteConfirm(true)}>
