@@ -11,16 +11,12 @@ import type {
 
 const MONTH_LABELS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
-function getLast12Months(): Array<{ month: string; label: string }> {
-  const result = [];
-  const now = new Date();
-  for (let i = 11; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const month = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    const label = `${MONTH_LABELS[d.getMonth()]}/${String(d.getFullYear()).slice(2)}`;
-    result.push({ month, label });
-  }
-  return result;
+function getYearMonths(year: number): Array<{ month: string; label: string }> {
+  const yy = String(year).slice(2);
+  return Array.from({ length: 12 }, (_, i) => ({
+    month: `${year}-${String(i + 1).padStart(2, "0")}`,
+    label: `${MONTH_LABELS[i]}/${yy}`,
+  }));
 }
 
 export function applyFilters(occurrences: DashboardOccurrence[], filters: DashboardFilters): DashboardOccurrence[] {
@@ -39,7 +35,8 @@ export function applyFilters(occurrences: DashboardOccurrence[], filters: Dashbo
 
 export function computeMetrics(
   occurrences: DashboardOccurrence[],
-  statuses: DashboardParam[]
+  statuses: DashboardParam[],
+  year: number = new Date().getFullYear()
 ): DashboardMetrics {
   const minOrder = statuses.length > 0 ? Math.min(...statuses.map((s) => s.order ?? 0)) : 1;
 
@@ -134,7 +131,7 @@ export function computeMetrics(
 
   // --- Monthly stacked-by-damage aggregations (4 series) ---
 
-  const months = getLast12Months();
+  const months = getYearMonths(year);
 
   // We bucket items by either openedMonth or closedMonth and aggregate by damageTypeId.
   const openedItemsMap = new Map<string, Map<string, number>>(); // month -> dt -> count

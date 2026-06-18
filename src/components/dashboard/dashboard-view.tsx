@@ -57,21 +57,38 @@ export function DashboardView({
   userRole,
 }: DashboardViewProps) {
   const [filters, setFilters] = useState<DashboardFilters>(EMPTY_FILTERS);
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+
+  const availableYears = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    const years = new Set<number>([currentYear]);
+    for (const o of occurrences) {
+      years.add(new Date(o.createdAtIso).getFullYear());
+      if (o.completedAtIso) years.add(new Date(o.completedAtIso).getFullYear());
+    }
+    return [...years].sort((a, b) => b - a);
+  }, [occurrences]);
+
+  // Pre-filter by selected year (createdAt) before any other filter
+  const yearFiltered = useMemo(
+    () => occurrences.filter((o) => new Date(o.createdAtIso).getFullYear() === selectedYear),
+    [occurrences, selectedYear]
+  );
 
   const filtered = useMemo(
-    () => applyFilters(occurrences, filters),
-    [occurrences, filters]
+    () => applyFilters(yearFiltered, filters),
+    [yearFiltered, filters]
   );
   const m = useMemo(
-    () => computeMetrics(filtered, statusParams),
-    [filtered, statusParams]
+    () => computeMetrics(filtered, statusParams, selectedYear),
+    [filtered, statusParams, selectedYear]
   );
 
   const canSeeUserRanking = userRole === "GESTOR" || userRole === "ADMIN";
   const hasIncompleteValues = m.zeroValueItems > 0;
   const avgDaysLabel = `${m.avgCycleDays.toFixed(1)} dias`;
   const activeFilters = Object.values(filters).filter(Boolean).length;
-  const periodLabel = formatPeriodLabel(filters);
+  const periodLabel = formatPeriodLabel(filters, selectedYear);
 
   // ----- Build damage-type series (shared across the 4 temporal charts) -----
   const damageSeriesTop: StackedSeries[] = m.damageUniverse
@@ -178,6 +195,9 @@ export function DashboardView({
           damageTypes={damageTypeParams}
           destinations={destinationParams}
           users={userParams}
+          selectedYear={selectedYear}
+          availableYears={availableYears}
+          onYearChange={setSelectedYear}
         />
 
         {/* 2 Hero KPIs */}
@@ -457,17 +477,17 @@ function buildStackedFromValue(
   });
 }
 
-function formatPeriodLabel(filters: DashboardFilters): string {
+function formatPeriodLabel(filters: DashboardFilters, year: number): string {
   if (filters.dateFrom && filters.dateTo) {
-    return `${formatDateBR(filters.dateFrom)} a ${formatDateBR(filters.dateTo)}`;
+    return `${year} · ${formatDateBR(filters.dateFrom)} a ${formatDateBR(filters.dateTo)}`;
   }
   if (filters.dateFrom) {
-    return `a partir de ${formatDateBR(filters.dateFrom)}`;
+    return `${year} · a partir de ${formatDateBR(filters.dateFrom)}`;
   }
   if (filters.dateTo) {
-    return `até ${formatDateBR(filters.dateTo)}`;
+    return `${year} · até ${formatDateBR(filters.dateTo)}`;
   }
-  return "todo o histórico";
+  return `Ano ${year}`;
 }
 
 function formatDateBR(iso: string): string {
