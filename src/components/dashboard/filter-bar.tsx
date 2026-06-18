@@ -10,6 +10,9 @@ interface FilterBarProps {
   damageTypes: DashboardParam[];
   destinations: DashboardParam[];
   users: DashboardParam[];
+  selectedYear?: number;
+  availableYears?: number[];
+  onYearChange?: (year: number) => void;
 }
 
 const fieldClass =
@@ -30,6 +33,11 @@ const labelStyle = {
   fontWeight: 600,
 };
 
+const globalLabelStyle = {
+  ...labelStyle,
+  color: "#0D6F65",
+};
+
 export function FilterBar({
   filters,
   onChange,
@@ -39,6 +47,9 @@ export function FilterBar({
   damageTypes,
   destinations,
   users,
+  selectedYear,
+  availableYears,
+  onYearChange,
 }: FilterBarProps) {
   const set =
     (key: keyof DashboardFilters) =>
@@ -49,13 +60,47 @@ export function FilterBar({
 
   return (
     <div
-      className="rounded-xl px-5 py-4"
+      className="rounded-xl px-5 py-4 space-y-3"
       style={{
         background: "#FFFFFF",
         border: "1px solid #DDE7DE",
         boxShadow: "0 1px 2px rgba(8,56,51,0.03)",
       }}
     >
+      {/* Filtro global de ano — apenas quando provido pelo consumidor */}
+      {selectedYear !== undefined && availableYears && onYearChange && (
+        <>
+          <div className="flex items-end gap-4 flex-wrap">
+            <div className="flex flex-col gap-1">
+              <span style={globalLabelStyle}>Ano de abertura · filtro global</span>
+              <select
+                value={selectedYear}
+                onChange={(e) => onYearChange(Number(e.target.value))}
+                className="rounded-md px-2.5 py-1.5 text-sm font-semibold outline-none cursor-pointer transition-colors focus:ring-2 focus:ring-offset-0"
+                style={{
+                  background: "#F0FAF8",
+                  border: "1px solid #0D6F65",
+                  color: "#044C45",
+                  colorScheme: "light" as const,
+                  minWidth: "90px",
+                }}
+              >
+                {availableYears.map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <p className="text-xs pb-1.5" style={{ color: "#9AA59F" }}>
+              Todos os KPIs e gráficos refletem o ano selecionado
+            </p>
+          </div>
+          <div style={{ height: "1px", background: "#DDE7DE" }} />
+        </>
+      )}
+
+      {/* Filtros secundários */}
       <div className="flex flex-wrap gap-x-4 gap-y-3 items-end">
         <div className="flex flex-col gap-1 min-w-[130px] flex-1">
           <span style={labelStyle}>Data inicial</span>
