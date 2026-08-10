@@ -59,16 +59,27 @@ conexões simultâneas. `statement_timeout = 30s`,
 
 ## Isolamento multi-cliente
 
-A Negri **ainda não existe** como `Client` formal (hoje só há o cliente de
-demonstração). Nada foi inventado: `negri_bi.integration_config` guarda o
-mapeamento `client_key = 'negri' → client_id`, e enquanto `client_id IS
-NULL` ou `active = false`:
+O registro existente em `public."Client"` (`id =
+cmp5rpjs20000lwy49lyqyq9e`, antes "Cliente Demonstração") foi formalizado
+como o cliente oficial **Negri Distribuidora** (`name = 'Negri
+Distribuidora'`, `slug = 'negri'`) — mesmo `id`, mesmo histórico de
+ocorrências/itens/produtos/usuários, sem migração de dados. `negri_bi.integration_config`
+guarda o mapeamento `client_key = 'negri' → client_id` e está **ativa**:
 
-- as 4 views retornam **zero linhas**;
-- as 4 tabelas de import **bloqueiam toda leitura e escrita** — validado
-  na prática durante os testes (Etapa 10/11) com o cliente de demonstração
-  temporariamente ativado e depois revertido para `client_id = NULL,
-  active = false`.
+```
+client_key = 'negri'
+client_id  = 'cmp5rpjs20000lwy49lyqyq9e'
+active     = true
+```
+
+As 4 views e as 4 tabelas de import já retornam/aceitam os dados da Negri
+normalmente. Enquanto `client_id IS NULL` ou `active = false` (estado
+inicial, hoje superado):
+
+- as 4 views retornariam **zero linhas**;
+- as 4 tabelas de import **bloqueariam toda leitura e escrita** — validado
+  na prática nos testes de segurança, com reversão controlada antes da
+  ativação definitiva.
 
 Nas tabelas de import, o isolamento é reforçado por **Row Level Security**
 (tabelas novas, não as de `public`), com uma policy por tabela restringindo
@@ -211,13 +222,19 @@ Para suspender sem perder o vínculo: `SET active = false` (mantém o
 **Pronto agora:**
 - Schema, role, views, tabelas de import (fundação) e isolamento por RLS
   no banco de produção.
-- Testes de segurança e de isolamento executados e revertidos com
-  sucesso (ver relatório da tarefa).
+- Cliente `Negri Distribuidora` formalizado (`id =
+  cmp5rpjs20000lwy49lyqyq9e`) e `negri_bi.integration_config` ativa e
+  apontando para esse `clientId`.
+- Testes de segurança e de isolamento executados com sucesso, incluindo
+  com a integração já ativa (views retornando os dados reais da Negri e
+  bloqueios continuando a funcionar).
 
-**Depende do cadastro formal da Negri como `Client`:**
-- Rodar o `UPDATE negri_bi.integration_config` acima com o `client_id`
-  real. Até lá, todas as views/tabelas de import ficam vazias/bloqueadas
-  por design.
+**Único passo pendente para a entrega ao TI da Negri:**
+1. Definir a senha de `negri_dashboard` (ver procedimento acima).
+2. Obter/confirmar Host e Port do Supavisor no dashboard do Supabase
+   (Project Settings → Database → Connection Pooling).
+3. Testar a conexão externa (Power BI / `psql`) com exatamente as mesmas
+   credenciais que serão entregues ao TI, antes de repassá-las.
 
 **Depende da definição das quatro fontes do Dashboard de Produtividade**
 (pedidos, itinerário/veículo/pedido, coleta manual de produtividade,
@@ -225,12 +242,6 @@ classificação Seco/Câmara):
 - Migration futura substituindo a coluna `payload jsonb` de cada
   `import_*` por colunas tipadas, uma vez que a especificação de negócio
   existir.
-
-**Depende da entrega de credenciais ao TI da Negri:**
-- Gerar a senha de `negri_dashboard` (ver procedimento acima) e repassar
-  por canal seguro (não e-mail em texto puro, não chat).
-- Confirmar host/porta/username exatos do Supavisor no dashboard do
-  Supabase antes de enviar a documentação de conexão ao TI.
 
 **Fora de escopo, sinalizado para decisão futura:**
 - RLS desabilitada nas 14 tabelas de `public` (achado pré-existente, ver
